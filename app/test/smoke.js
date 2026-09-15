@@ -67,7 +67,7 @@ async function main() {
   try {
     await waitForServer(base);
 
-    // 1. GET /api/records: seeded, >=100 records, includes pinned 1428 Mission Rd record
+    // 1. GET /api/records: seeded, >=100 records, includes pinned 1428 Mission College Blvd record
     const listRes = await fetch(`${base}/api/records`);
     ok(listRes.status === 200, 'GET /api/records returns 200');
     const listData = await listRes.json();
@@ -81,7 +81,7 @@ async function main() {
 
     // 2. POST a record with a tiny valid JPEG
     const postBody = {
-      address: '999 Test St, Los Angeles, CA 90001',
+      address: '999 Test St, Columbus, OH 43215',
       container: 'CT-96-2210',
       status: 'collected',
       reason: null,

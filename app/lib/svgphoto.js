@@ -10,16 +10,6 @@ function hashStr(s) {
   return h >>> 0;
 }
 
-const stampFmt = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit',
-  hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZoneName: 'short',
-});
-
-function fmtStamp(iso) {
-  // Burned-in like a dashcam: local wall-clock at the stop, e.g. "2026-08-12 06:36:35 PDT".
-  return stampFmt.format(new Date(iso)).replace(',', '');
-}
-
 export function renderPhotoSvg(record) {
   const rand = mulberry32(hashStr(record.id));
   const W = 400;
@@ -63,8 +53,8 @@ export function renderPhotoSvg(record) {
       <ellipse cx="220" cy="130" rx="24" ry="12" fill="#e7e2c9" stroke="#8a8460"/>`;
   }
 
-  const ts = fmtStamp(record.capturedAt);
-  const gpsLine = record.gps ? `${record.gps.lat.toFixed(5)}, ${record.gps.lon.toFixed(5)}` : 'no gps fix';
+  // No burned-in timestamp or GPS: the record is the single source of truth for both,
+  // and a stamp in the pixels can only ever agree with it or contradict it.
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
 <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
@@ -75,8 +65,6 @@ export function renderPhotoSvg(record) {
 <rect y="190" width="${W}" height="6" fill="#8a8a8a"/>
 ${binShape}
 ${extra}
-<rect y="${H - 30}" width="${W}" height="30" fill="#000" opacity="0.72"/>
-<text x="8" y="${H - 11}" font-family="monospace" font-size="12" fill="#e8e8e8">${ts}  ${gpsLine}</text>
 <text x="${W - 10}" y="14" font-family="sans-serif" font-size="9" fill="#ffffffaa" text-anchor="end">synthetic demo image</text>
 </svg>`;
 }

@@ -432,3 +432,5 @@ dl.record-dl dd {
   .photo-full { max-height: 60vh; object-fit: contain; }
   #map { display: none !important; }
 }
+
+.loc-warn { color: var(--red); font-size: 13px; margin-top: 4px; }

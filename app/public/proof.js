@@ -1,5 +1,11 @@
 (() => {
   const el = (id) => document.getElementById(id);
+  const haversineKm = (lat1, lon1, lat2, lon2) => {
+    const R = 6371, toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  };
   const parts = location.pathname.split('/').filter(Boolean); // ['p', id]
   const id = decodeURIComponent(parts[1] || '');
 
@@ -95,6 +101,19 @@
         }).addTo(map);
         L.marker([record.gps.lat, record.gps.lon]).addTo(map);
       }
+      // If this stop has a known location, say how far the fix is from it. A pin that
+      // quietly lands in the wrong city under the right address is worse than no pin.
+      fetch('/api/schedule').then((r) => r.json()).then(({ stops }) => {
+        const stop = (stops || []).find((s) => s.address === record.address);
+        if (!stop) return;
+        const km = haversineKm(record.gps.lat, record.gps.lon, stop.lat, stop.lon);
+        if (km > 1) {
+          const warn = document.createElement('div');
+          warn.className = 'loc-warn';
+          warn.textContent = `Fix is ${km < 10 ? km.toFixed(1) : Math.round(km)} km from this stop's scheduled location.`;
+          el('locText').after(warn);
+        }
+      }).catch(() => {});
     } else {
       el('locText').textContent = 'No GPS fix at capture';
     }
