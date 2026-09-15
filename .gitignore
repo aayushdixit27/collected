@@ -1,0 +1,40 @@
+# ALLOWLIST GITIGNORE — ignore everything, then un-ignore only what ships.
+# This repo lives inside a folder containing call recordings, transcripts, interview
+# analysis and compensation notes. Those must never be committed, private repo or not.
+# Denylisting is one forgotten entry away from a leak; this is the safe direction.
+
+# 1. Ignore everything
+*
+
+# 2. Un-ignore the directories we need to descend into
+!*/
+# ...but re-ignore the ones that must never ship, including their contents
+Meetings/
+Transcripts/
+Field\ Guides/
+archive/
+.claude/
+Take-home/
+
+# 3. Un-ignore only what ships
+!README.md
+!LICENSE
+!.gitignore
+!app/
+!app/**
+
+# 4. Belt and braces — never, under any circumstances
+*.m4a
+*.txt
+*_that_worked.md
+product_findings*.md
+decision-log.md
+00-context.md
+01-call-review-john.md
+CLAUDE.md
+**/CLAUDE.md
+**/daily-log.md
+.DS_Store
+node_modules/
+.env
+.env.*
