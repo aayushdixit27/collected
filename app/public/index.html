@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Collected — capture</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="wrap">
+  <p class="brand"><b>Collected</b> · proof that the truck came</p>
+
+  <div id="captureView">
+    <div class="gps-row"><span id="gpsDot" class="gps-dot"></span><span id="gpsText">Finding GPS…</span></div>
+
+    <div class="section-label">Today's stops</div>
+    <div id="chipRow" class="chip-row scroll"><span style="color:var(--text-dim); font-size:13px;">Loading schedule…</span></div>
+
+    <div class="section-label">Address or container ID</div>
+    <input id="addressInput" class="field" type="text" placeholder="Start typing an address or container ID" autocomplete="off">
+    <div id="suggestions" class="suggestions hidden"></div>
+    <div id="containerChipWrap"></div>
+
+    <div class="section-label">Photo</div>
+    <div id="cameraWrap">
+      <label class="camera-btn" id="cameraBtn">
+        📷 Take photo
+        <input id="cameraInput" type="file" accept="image/*" capture="environment">
+      </label>
+    </div>
+
+    <div class="section-label">Status</div>
+    <div id="statusRow" class="chip-row">
+      <button type="button" class="chip selected" data-status="collected">Collected</button>
+      <button type="button" class="chip" data-status="delivered">Delivered</button>
+      <button type="button" class="chip" data-status="removed">Removed</button>
+      <button type="button" class="chip" data-status="not_collected">Could not collect</button>
+    </div>
+    <div id="reasonRow" class="chip-row hidden">
+      <button type="button" class="chip small" data-reason="blocked_access">Blocked access</button>
+      <button type="button" class="chip small" data-reason="overfilled">Overfilled</button>
+      <button type="button" class="chip small" data-reason="contaminated">Contaminated</button>
+      <button type="button" class="chip small" data-reason="not_out">Not out</button>
+    </div>
+
+    <button type="button" id="noteToggle" class="note-toggle">+ add note</button>
+    <input id="noteInput" class="field hidden" type="text" maxlength="140" placeholder="Note (optional)">
+
+    <button type="button" id="saveBtn" class="btn-primary" disabled>Save</button>
+  </div>
+
+  <div id="confirmView" class="confirm hidden">
+    <div class="check">✓</div>
+    <div class="elapsed" id="elapsedText">Recorded in 0.0s</div>
+    <div class="url" id="proofUrlText"></div>
+    <div class="btn-row">
+      <button type="button" id="copyLinkBtn" class="btn-secondary">Copy link</button>
+      <button type="button" id="shareBtn" class="btn-secondary hidden">Share</button>
+      <button type="button" id="nextStopBtn" class="btn-primary" style="margin-top:0;">Next stop</button>
+    </div>
+  </div>
+
+  <a class="footer-link" href="/office">Office view</a>
+</div>
+<script src="/capture.js"></script>
+</body>
+</html>

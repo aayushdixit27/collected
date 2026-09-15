@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/p/:id", "destination": "/p.html" },
+    { "source": "/office", "destination": "/office.html" }
+  ]
+}

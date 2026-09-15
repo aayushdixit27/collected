@@ -1,0 +1,13 @@
+{
+  "name": "collected",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node dev.js",
+    "test": "node test/smoke.js"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.8.0"
+  }
+}

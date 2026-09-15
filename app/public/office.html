@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Collected — office</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="wrap-wide">
+  <p class="brand"><b>Collected</b> · office retrieval</p>
+
+  <div class="office-controls">
+    <input id="qInput" class="field" type="text" placeholder="Search address or container ID">
+    <div class="row2">
+      <input id="fromInput" class="field" type="date">
+      <input id="toInput" class="field" type="date">
+    </div>
+    <select id="statusSelect" class="field">
+      <option value="">Any status</option>
+      <option value="collected">Collected</option>
+      <option value="delivered">Delivered</option>
+      <option value="removed">Removed</option>
+      <option value="not_collected">Could not collect</option>
+    </select>
+  </div>
+
+  <div id="summaryLine" class="summary-line"></div>
+
+  <div class="stat-strip">
+    <div class="stat-card">
+      <div class="num" id="statCoverage">—</div>
+      <div class="label">Coverage</div>
+      <div class="sub" id="statCoverageSub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="statMedian">—</div>
+      <div class="label">Median capture</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="statRecords">—</div>
+      <div class="label">Records</div>
+    </div>
+  </div>
+
+  <div id="results"></div>
+
+  <a class="footer-link" href="/">Driver capture</a>
+</div>
+<script src="/office.js"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Collected — proof</title>
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+</head>
+<body>
+<div class="wrap">
+  <div id="retrievedBadge" class="retrieved-badge hidden"></div>
+  <p class="brand"><b>Collected</b> · service record</p>
+
+  <div id="loadingState" style="color:var(--text-dim); font-size:14px;">Loading…</div>
+
+  <div id="notFoundState" class="not-found hidden">
+    <p>No record found for this link.</p>
+    <a href="/">Driver capture</a> · <a href="/office">Office view</a>
+  </div>
+
+  <div id="recordState" class="hidden">
+    <img id="photo" class="photo-full" alt="Service event photo">
+    <span id="statusBadge" class="badge"></span>
+
+    <dl class="record-dl">
+      <dt>Address</dt><dd id="ddAddress"></dd>
+      <dt>Container</dt><dd id="ddContainer"></dd>
+      <dt>Captured</dt><dd id="ddCaptured"></dd>
+      <dt>Location</dt>
+      <dd id="ddLocation">
+        <div id="locText"></div>
+        <div id="map" class="hidden"></div>
+        <div><a id="gmapsLink" target="_blank" rel="noopener" class="hidden">Open in Google Maps</a></div>
+      </dd>
+      <dt id="dtNote" class="hidden">Note</dt><dd id="ddNote" class="hidden"></dd>
+      <dt>Record ID</dt><dd id="ddId" class="mono"></dd>
+      <dt>Received by server</dt><dd id="ddReceived" class="mono"></dd>
+    </dl>
+
+    <p class="footer-note">Created at the moment of capture. Not editable.</p>
+
+    <div class="proof-actions no-print">
+      <button type="button" id="copyLinkBtn" class="btn-secondary">Copy link</button>
+      <button type="button" id="printBtn" class="btn-secondary">Print / save as PDF</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/proof.js"></script>
+</body>
+</html>

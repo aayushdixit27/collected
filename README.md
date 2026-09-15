@@ -5,7 +5,7 @@
 A ten-second record of a waste collection — timestamp, location, photo, container — that can
 still be found forty-five days later, when someone disputes it.
 
-🔗 **Live:** _pending — link goes here_ · 🎥 **Demo:** _pending_
+🔗 **Live:** https://collected-nu.vercel.app · 🎥 **Demo:** _pending_
 
 ---
 

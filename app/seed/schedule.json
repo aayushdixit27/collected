@@ -1,0 +1,322 @@
+[
+  {
+    "address": "1428 Mission Rd, Los Angeles, CA 90033",
+    "container": "RO-20-114",
+    "weekday": 3,
+    "lat": 34.0453,
+    "lon": -118.214,
+    "routeOrder": 1
+  },
+  {
+    "address": "6408 Olympic Blvd, Los Angeles, CA 90027",
+    "container": "RO-20-350",
+    "weekday": 4,
+    "lat": 34.02861,
+    "lon": -118.24305,
+    "routeOrder": 1
+  },
+  {
+    "address": "654 Mission Rd, Los Angeles, CA 90004",
+    "container": "FL-2-017",
+    "weekday": 2,
+    "lat": 34.01711,
+    "lon": -118.22574,
+    "routeOrder": 1
+  },
+  {
+    "address": "6730 Olympic Blvd, Los Angeles, CA 90014",
+    "container": "RO-10-797",
+    "weekday": 1,
+    "lat": 34.06033,
+    "lon": -118.23876,
+    "routeOrder": 1
+  },
+  {
+    "address": "8327 Temple St, Los Angeles, CA 90031",
+    "container": "FL-4-078",
+    "weekday": 1,
+    "lat": 34.01561,
+    "lon": -118.29181,
+    "routeOrder": 2
+  },
+  {
+    "address": "3891 Jefferson Blvd, Los Angeles, CA 90078",
+    "container": "CT-96-3184",
+    "weekday": 3,
+    "lat": 34.06037,
+    "lon": -118.25692,
+    "routeOrder": 2
+  },
+  {
+    "address": "7284 Beverly Blvd, Los Angeles, CA 90017",
+    "container": "CT-32-1267",
+    "weekday": 5,
+    "lat": 34.02042,
+    "lon": -118.31726,
+    "routeOrder": 1
+  },
+  {
+    "address": "8986 Exposition Blvd, Los Angeles, CA 90032",
+    "container": "FL-3-048",
+    "weekday": 1,
+    "lat": 34.04652,
+    "lon": -118.21453,
+    "routeOrder": 3
+  },
+  {
+    "address": "2485 Florence Ave, Los Angeles, CA 90058",
+    "container": "CT-64-5943",
+    "weekday": 3,
+    "lat": 34.06893,
+    "lon": -118.22656,
+    "routeOrder": 3
+  },
+  {
+    "address": "9240 Adams Blvd, Los Angeles, CA 90017",
+    "container": "RO-20-568",
+    "weekday": 4,
+    "lat": 34.07525,
+    "lon": -118.25775,
+    "routeOrder": 2
+  },
+  {
+    "address": "7380 Vermont Ave, Los Angeles, CA 90042",
+    "container": "RO-40-116",
+    "weekday": 4,
+    "lat": 34.00419,
+    "lon": -118.2899,
+    "routeOrder": 3
+  },
+  {
+    "address": "4926 6th St, Los Angeles, CA 90082",
+    "container": "CT-32-8784",
+    "weekday": 4,
+    "lat": 34.03681,
+    "lon": -118.28772,
+    "routeOrder": 4
+  },
+  {
+    "address": "437 Cesar Chavez Ave, Los Angeles, CA 90031",
+    "container": "RO-30-609",
+    "weekday": 5,
+    "lat": 34.01765,
+    "lon": -118.25586,
+    "routeOrder": 2
+  },
+  {
+    "address": "580 Sunset Blvd, Los Angeles, CA 90004",
+    "container": "RO-30-136",
+    "weekday": 1,
+    "lat": 34.06049,
+    "lon": -118.26004,
+    "routeOrder": 4
+  },
+  {
+    "address": "4824 Wilshire Blvd, Los Angeles, CA 90026",
+    "container": "RO-30-442",
+    "weekday": 4,
+    "lat": 34.0415,
+    "lon": -118.27128,
+    "routeOrder": 5
+  },
+  {
+    "address": "1791 Melrose Ave, Los Angeles, CA 90045",
+    "container": "RO-30-476",
+    "weekday": 5,
+    "lat": 34.07524,
+    "lon": -118.22358,
+    "routeOrder": 3
+  },
+  {
+    "address": "4093 Vernon Ave, Los Angeles, CA 90070",
+    "container": "RO-10-350",
+    "weekday": 2,
+    "lat": 34.05261,
+    "lon": -118.24944,
+    "routeOrder": 2
+  },
+  {
+    "address": "321 Slauson Ave, Los Angeles, CA 90039",
+    "container": "FL-2-020",
+    "weekday": 3,
+    "lat": 34.07346,
+    "lon": -118.24617,
+    "routeOrder": 4
+  },
+  {
+    "address": "9504 Exposition Blvd, Los Angeles, CA 90045",
+    "container": "FL-8-012",
+    "weekday": 1,
+    "lat": 34.08722,
+    "lon": -118.30691,
+    "routeOrder": 5
+  },
+  {
+    "address": "1501 Alvarado St, Los Angeles, CA 90028",
+    "container": "CT-64-4064",
+    "weekday": 4,
+    "lat": 34.01875,
+    "lon": -118.22058,
+    "routeOrder": 6
+  },
+  {
+    "address": "6672 Slauson Ave, Los Angeles, CA 90070",
+    "container": "FL-6-043",
+    "weekday": 1,
+    "lat": 34.09777,
+    "lon": -118.27504,
+    "routeOrder": 6
+  },
+  {
+    "address": "6894 Hoover St, Los Angeles, CA 90047",
+    "container": "RO-40-389",
+    "weekday": 1,
+    "lat": 34.07738,
+    "lon": -118.21761,
+    "routeOrder": 7
+  },
+  {
+    "address": "8887 Beverly Blvd, Los Angeles, CA 90017",
+    "container": "CT-96-8456",
+    "weekday": 4,
+    "lat": 34.04207,
+    "lon": -118.24268,
+    "routeOrder": 7
+  },
+  {
+    "address": "6336 Broadway, Los Angeles, CA 90059",
+    "container": "CT-64-5135",
+    "weekday": 2,
+    "lat": 34.07696,
+    "lon": -118.31003,
+    "routeOrder": 3
+  },
+  {
+    "address": "8908 Alameda St, Los Angeles, CA 90079",
+    "container": "CT-96-5263",
+    "weekday": 1,
+    "lat": 34.00958,
+    "lon": -118.27523,
+    "routeOrder": 8
+  },
+  {
+    "address": "5383 Manchester Ave, Los Angeles, CA 90053",
+    "container": "RO-10-878",
+    "weekday": 4,
+    "lat": 34.0202,
+    "lon": -118.23289,
+    "routeOrder": 8
+  },
+  {
+    "address": "7426 Temple St, Los Angeles, CA 90019",
+    "container": "FL-8-089",
+    "weekday": 3,
+    "lat": 34.0375,
+    "lon": -118.27369,
+    "routeOrder": 5
+  },
+  {
+    "address": "6233 Hoover St, Los Angeles, CA 90023",
+    "container": "RO-10-616",
+    "weekday": 3,
+    "lat": 34.00972,
+    "lon": -118.285,
+    "routeOrder": 6
+  },
+  {
+    "address": "6365 Jefferson Blvd, Los Angeles, CA 90074",
+    "container": "CT-64-8670",
+    "weekday": 1,
+    "lat": 34.08998,
+    "lon": -118.31875,
+    "routeOrder": 9
+  },
+  {
+    "address": "8815 Crenshaw Blvd, Los Angeles, CA 90034",
+    "container": "FL-3-036",
+    "weekday": 2,
+    "lat": 34.07759,
+    "lon": -118.24017,
+    "routeOrder": 4
+  },
+  {
+    "address": "780 Adams Blvd, Los Angeles, CA 90013",
+    "container": "CT-32-8208",
+    "weekday": 4,
+    "lat": 34.09076,
+    "lon": -118.31928,
+    "routeOrder": 9
+  },
+  {
+    "address": "2449 Sunset Blvd, Los Angeles, CA 90049",
+    "container": "CT-96-7990",
+    "weekday": 3,
+    "lat": 34.06208,
+    "lon": -118.30258,
+    "routeOrder": 7
+  },
+  {
+    "address": "3064 Mission Rd, Los Angeles, CA 90024",
+    "container": "RO-20-517",
+    "weekday": 3,
+    "lat": 34.03745,
+    "lon": -118.23272,
+    "routeOrder": 8
+  },
+  {
+    "address": "6267 San Pedro St, Los Angeles, CA 90043",
+    "container": "FL-8-056",
+    "weekday": 2,
+    "lat": 34.08907,
+    "lon": -118.21757,
+    "routeOrder": 5
+  },
+  {
+    "address": "3936 Vermont Ave, Los Angeles, CA 90043",
+    "container": "CT-32-7668",
+    "weekday": 2,
+    "lat": 34.06212,
+    "lon": -118.21845,
+    "routeOrder": 6
+  },
+  {
+    "address": "3301 Alvarado St, Los Angeles, CA 90020",
+    "container": "CT-64-1014",
+    "weekday": 5,
+    "lat": 34.09823,
+    "lon": -118.21863,
+    "routeOrder": 4
+  },
+  {
+    "address": "442 Soto St, Los Angeles, CA 90077",
+    "container": "FL-2-083",
+    "weekday": 4,
+    "lat": 34.00877,
+    "lon": -118.28761,
+    "routeOrder": 10
+  },
+  {
+    "address": "6699 Mission Rd, Los Angeles, CA 90008",
+    "container": "RO-30-291",
+    "weekday": 4,
+    "lat": 34.03721,
+    "lon": -118.2176,
+    "routeOrder": 11
+  },
+  {
+    "address": "5719 San Pedro St, Los Angeles, CA 90028",
+    "container": "CT-64-9034",
+    "weekday": 1,
+    "lat": 34.00801,
+    "lon": -118.27951,
+    "routeOrder": 10
+  },
+  {
+    "address": "7092 San Pedro St, Los Angeles, CA 90063",
+    "container": "CT-96-5078",
+    "weekday": 1,
+    "lat": 34.03832,
+    "lon": -118.30216,
+    "routeOrder": 11
+  }
+]
