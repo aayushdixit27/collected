@@ -16,18 +16,49 @@ Los Angeles publishes what it collects from haulers who cannot prove they showed
 > **626 liquidated damages letters. $3,432,000 assessed. $2,225,575 paid.**
 > — City of Los Angeles, program inception through May 2023
 
+These are service-level penalties, not fines for pollution. In a franchised city the hauler
+holds a contract with the municipality: a customer reports a missed pickup, which starts a
+clock — Los Angeles requires collection by 6pm if reported before 2pm, New York gives twelve
+hours, Sonoma twenty-four. Miss the clock and liquidated damages attach per incident.
+
 The same report names the evidence that defeats an assessment:
 
 > *"provide a date and time stamped picture of the collection"*
 
 The regulator wrote the product spec. San Diego's 2025 city audit shows the same enforcement
-pattern — repeated annual assessments, real invoices, occasional discretionary waivers.
+pattern: repeated annual assessments, real invoices, occasional discretionary waivers.
+
+And the detail that reframes the whole thing — LA documents make-up service *"as documented
+in the City CRM."* **The hauler is being judged by the city's record of whether they showed
+up, and has nothing of its own to put beside it.**
 
 Meanwhile, on the other side of the same missing record, customers describe being billed for
 overages weeks after the container is gone: $500 at fourteen days, $414 at one month on a
 half-full load of dry dirt, $1,989 refunded only after escalation, on a ticket with no tare
 weight recorded. One of them states the structural problem exactly: *"dumpster did not come
 with a scale so there is no way of me knowing what the weight is."*
+
+## How the bill gets late
+
+The mechanism matters, because it explains why the obvious fixes miss.
+
+1. A customer rents a 20-yard at a flat rate that includes one ton.
+2. The driver pulls the full can and drives to the transfer station.
+3. The scale house weighs in gross, out tare, and issues a **paper ticket** with the net.
+4. Net, minus the included ton, times the per-ton rate, is the overage.
+5. That ticket now has to get from the truck cab to whoever does the billing.
+
+Step five is the whole problem. Today it travels by crumpled cab, by photo texted into a
+WhatsApp group, or by someone re-typing tickets into QuickBooks on a Friday. **The bill is
+late because the paper is slow.** The fourteen-day and one-month surprise charges in the
+evidence above are that lag, arriving after the container's contents are buried and the
+customer has nothing left to argue with.
+
+And notice what the scale ticket does *not* cover. The event has nine parts — delivery,
+the fill period, pickup condition and access, transport, the scale, waste classification,
+ticket transfer, invoicing, dispute — and **only the scale produces a durable artifact.**
+Every argument about overfilling, third-party dumping or blocked access is unwinnable by
+either side, because nobody recorded the moment it happened.
 
 ## The crux
 
@@ -56,10 +87,22 @@ Whatever you tell a system counts as finished is the highest-leverage line in it
 
 **The product is retrieval, not capture.**
 
-Every driver already has a camera. Photos get taken. The photo fails to win the appeal
-because nobody can find it six weeks later against the right address on the right date.
-"Find me the collection at 1428 Mission on August 12" is the product. Capture is the cheap
-half.
+Every driver already has a camera, and photos do get taken. One operator: *"I did take
+photos of the load when I dumped it... If the contractor ever complained, I could show
+them."* A customer: *"The guy I use always sends me a pic of the dump ticket."*
+
+So the record is not missing. **It is unaddressable** — sitting in a camera roll as
+`IMG_4471.jpg`, or in a text thread, with no address, no date-to-job link, no container.
+
+Which is two failure modes, not one:
+
+- **Retrieval.** The photo exists and cannot be tied to a job. "Find me the collection at
+  1428 Mission on August 12" is the product.
+- **Coverage.** The moment that decides most disputes, pickup condition and access, is
+  never photographed at all, because the only habit operators have is photographing at the
+  dump.
+
+The moment that matters is uncaptured; the moment that is captured is unfindable.
 
 1. **Capture** — address, photo, automatic timestamp and geolocation. One screen, one hand,
    from the cab. If it takes longer than ten seconds it produces nothing.
@@ -118,6 +161,27 @@ lack of time.
 - Community forums returned nothing usable on several passes. Restaurants and property
   managers are entirely unevidenced. No willingness-to-pay figure was obtained from any
   verified small operator.
+
+## How this gets measured
+
+One number, and it is an input rather than an outcome, because an outcome cannot be assigned
+to a single change.
+
+> **Percentage of service events with a retrievable record.** Given only an address and a
+> date, can someone put a timestamped photo of that event on screen in under thirty seconds?
+
+It is the right number because it contains both failure modes at once. A photo that was never
+taken scores zero. A photo sitting unindexed in a camera roll also scores zero. And nothing
+downstream survives without it: you cannot win an appeal for a stop you have no record of, or
+answer an overage dispute with a recollection.
+
+Three inputs move it: **time to capture** (under ten seconds, which is the adoption lever),
+**coverage** (share of scheduled stops with a record), and **time to retrieve** (under thirty
+seconds from address and date). Appeals won and dollars recovered are outputs. They follow.
+
+**The one thing this will not trade:** capture speed. If a new field improves the record but
+pushes capture past ten seconds, the field loses, because a perfect record nobody creates is
+worth zero.
 
 ## Roadmap
 
