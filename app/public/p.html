@@ -8,10 +8,11 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 </head>
 <body>
-<div class="proof-wrap">
-  <div id="retrievedBadge" class="retrieved-badge hidden no-print"></div>
+<div class="wrap">
+  <div id="retrievedBadge" class="retrieved-badge hidden"></div>
+  <p class="brand"><b>Collected</b> · service record</p>
 
-  <div id="loadingState" style="color:var(--ink-2); font-size:14px;">Loading…</div>
+  <div id="loadingState" style="color:var(--text-dim); font-size:14px;">Loading…</div>
 
   <div id="notFoundState" class="not-found hidden">
     <p>No record found for this link.</p>
@@ -19,58 +20,30 @@
   </div>
 
   <div id="recordState" class="hidden">
-    <div class="proof-title-row">
-      <h1>Service record</h1>
-      <span class="rec-id mono" id="ddId"></span>
-    </div>
-
     <img id="photo" class="photo-full" alt="Service event photo">
+    <span id="statusBadge" class="badge"></span>
 
-    <table class="record-table">
-      <tbody>
-        <tr>
-          <th>Status</th>
-          <td><span id="statusBadge" class="badge"></span></td>
-        </tr>
-        <tr>
-          <th>Address</th>
-          <td id="ddAddress"></td>
-        </tr>
-        <tr>
-          <th>Container</th>
-          <td class="mono" id="ddContainer"></td>
-        </tr>
-        <tr>
-          <th>Captured</th>
-          <td id="ddCaptured"></td>
-        </tr>
-        <tr>
-          <th>Location</th>
-          <td>
-            <svg class="pin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-7.58 7-12a7 7 0 1 0-14 0c0 4.42 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>
-            <span class="mono" id="locText"></span><span id="locWarn"></span>
-          </td>
-        </tr>
-        <tr id="rowNote" class="hidden">
-          <th>Note</th>
-          <td id="ddNote"></td>
-        </tr>
-        <tr>
-          <th>Received by server</th>
-          <td class="mono" id="ddReceived"></td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div id="map" class="hidden"></div>
-    <a id="gmapsLink" target="_blank" rel="noopener" class="gmaps-link hidden">Open in Google Maps</a>
-
-    <div class="proof-actions no-print">
-      <button type="button" id="copyLinkBtn" class="btn-plain">Copy link</button>
-      <button type="button" id="printBtn" class="btn-plain">Print</button>
-    </div>
+    <dl class="record-dl">
+      <dt>Address</dt><dd id="ddAddress"></dd>
+      <dt>Container</dt><dd id="ddContainer"></dd>
+      <dt>Captured</dt><dd id="ddCaptured"></dd>
+      <dt>Location</dt>
+      <dd id="ddLocation">
+        <div id="locText"></div>
+        <div id="map" class="hidden"></div>
+        <div><a id="gmapsLink" target="_blank" rel="noopener" class="hidden">Open in Google Maps</a></div>
+      </dd>
+      <dt id="dtNote" class="hidden">Note</dt><dd id="ddNote" class="hidden"></dd>
+      <dt>Record ID</dt><dd id="ddId" class="mono"></dd>
+      <dt>Received by server</dt><dd id="ddReceived" class="mono"></dd>
+    </dl>
 
     <p class="footer-note">Created at the moment of capture. Not editable.</p>
+
+    <div class="proof-actions no-print">
+      <button type="button" id="copyLinkBtn" class="btn-secondary">Copy link</button>
+      <button type="button" id="printBtn" class="btn-secondary">Print / save as PDF</button>
+    </div>
   </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>

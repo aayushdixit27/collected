@@ -7,79 +7,61 @@
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-<main class="capture" id="app" data-state="ready">
-  <p class="brand-mark">Collected</p>
+<div class="wrap">
+  <p class="brand"><b>Collected</b> · proof that the truck came</p>
 
-  <section data-panel="ready">
-    <button type="button" class="stop-line" id="stopLineReady">
-      <span class="stop-address" id="stopAddressReady">Loading schedule…</span>
-      <span class="stop-container mono" id="stopContainerReady"></span>
-    </button>
+  <div id="captureView">
+    <div class="gps-row"><span id="gpsDot" class="gps-dot"></span><span id="gpsText">Finding GPS…</span></div>
 
-    <label class="camera-btn" id="cameraBtn" for="cameraInput">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-2h6l2 2h3v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8z"/><circle cx="12" cy="13" r="3.5"/></svg>
-      Take photo
-    </label>
+    <div class="section-label">Today's stops</div>
+    <div id="chipRow" class="chip-row scroll"><span style="color:var(--text-dim); font-size:13px;">Loading schedule…</span></div>
 
-    <button type="button" class="other-stop-btn" id="otherStopBtn">Other stop…</button>
-  </section>
+    <div class="section-label">Address or container ID</div>
+    <input id="addressInput" class="field" type="text" placeholder="Start typing an address or container ID" autocomplete="off">
+    <div id="suggestions" class="suggestions hidden"></div>
+    <div id="containerChipWrap"></div>
 
-  <section data-panel="photo">
-    <div class="photo-frame" id="photoFrame"></div>
+    <div class="section-label">Photo</div>
+    <div id="cameraWrap">
+      <label class="camera-btn" id="cameraBtn">
+        📷 Take photo
+        <input id="cameraInput" type="file" accept="image/*" capture="environment">
+      </label>
+    </div>
 
-    <button type="button" class="stop-line" id="stopLinePhoto">
-      <span class="stop-address" id="stopAddressPhoto"></span>
-      <span class="stop-container mono" id="stopContainerPhoto"></span>
-    </button>
-    <button type="button" class="retake-btn" id="retakeBtn">Retake</button>
+    <div class="section-label">Status</div>
+    <div id="statusRow" class="chip-row">
+      <button type="button" class="chip selected" data-status="collected">Collected</button>
+      <button type="button" class="chip" data-status="delivered">Delivered</button>
+      <button type="button" class="chip" data-status="removed">Removed</button>
+      <button type="button" class="chip" data-status="not_collected">Could not collect</button>
+    </div>
+    <div id="reasonRow" class="chip-row hidden">
+      <button type="button" class="chip small" data-reason="blocked_access">Blocked access</button>
+      <button type="button" class="chip small" data-reason="overfilled">Overfilled</button>
+      <button type="button" class="chip small" data-reason="contaminated">Contaminated</button>
+      <button type="button" class="chip small" data-reason="not_out">Not out</button>
+    </div>
+
+    <button type="button" id="noteToggle" class="note-toggle">+ add note</button>
+    <input id="noteInput" class="field hidden" type="text" maxlength="140" placeholder="Note (optional)">
 
     <button type="button" id="saveBtn" class="btn-primary" disabled>Save</button>
-
-    <details class="disclosure" id="couldNotDisclosure">
-      <summary>Could not service</summary>
-      <div class="rect-row" id="reasonRow">
-        <button type="button" class="rect-btn" data-reason="blocked_access">Blocked access</button>
-        <button type="button" class="rect-btn" data-reason="overfilled">Overfilled</button>
-        <button type="button" class="rect-btn" data-reason="contaminated">Contaminated</button>
-        <button type="button" class="rect-btn" data-reason="not_out">Not out</button>
-      </div>
-      <div class="rect-row" id="statusRow">
-        <button type="button" class="rect-btn" data-status="delivered">Delivered</button>
-        <button type="button" class="rect-btn" data-status="removed">Removed</button>
-      </div>
-    </details>
-
-    <button type="button" class="note-toggle" id="noteToggle">Add a note</button>
-    <input id="noteInput" class="field hidden" type="text" maxlength="140" placeholder="Note (optional)">
-  </section>
-
-  <section data-panel="saved">
-    <div class="saved-elapsed" id="elapsedText">Recorded in 0.0s</div>
-    <div class="saved-link mono" id="proofUrlText"></div>
-    <div class="saved-gps-warning hidden" id="gpsWarning">Saved without a location fix.</div>
-    <div class="saved-actions">
-      <button type="button" id="copyLinkBtn">Copy link</button>
-      <button type="button" id="shareBtn" class="hidden">Share</button>
-      <button type="button" id="nextStopBtn">Next stop</button>
-    </div>
-  </section>
-</main>
-
-<input id="cameraInput" class="visually-hidden" type="file" accept="image/*" capture="environment">
-
-<dialog class="stop-overlay" id="stopDialog" aria-label="Choose a stop">
-  <div class="stop-overlay-inner">
-    <div class="stop-overlay-header">
-      <div class="field-icon-wrap">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="stopFilterInput" class="field" type="text" placeholder="Filter by address or container">
-      </div>
-      <button type="button" class="stop-overlay-close" id="stopDialogClose" aria-label="Close">×</button>
-    </div>
-    <div id="stopList"></div>
   </div>
-</dialog>
 
+  <div id="confirmView" class="confirm hidden">
+    <div class="check">✓</div>
+    <div class="elapsed" id="elapsedText">Recorded in 0.0s</div>
+    <div class="url" id="proofUrlText"></div>
+    <div class="btn-row">
+      <button type="button" id="copyLinkBtn" class="btn-secondary">Copy link</button>
+      <button type="button" id="shareBtn" class="btn-secondary hidden">Share</button>
+      <button type="button" id="nextStopBtn" class="btn-primary" style="margin-top:0;">Next stop</button>
+    </div>
+  </div>
+
+  <a class="footer-link" href="/office">Office view</a>
+</div>
 <script src="/capture.js"></script>
 </body>
 </html>
