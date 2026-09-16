@@ -87,6 +87,7 @@
     }
     let total = 0;
     let have = 0;
+    const todayStr = dateOnly(new Date().toISOString());
     const start = new Date(from + 'T00:00:00.000Z');
     const end = new Date(to + 'T00:00:00.000Z');
     for (let t = start.getTime(); t <= end.getTime(); t += 86400000) {
@@ -95,6 +96,9 @@
       const weekday = dow === 0 ? 7 : dow;
       if (weekday > 5) continue;
       const dateStr = day.toISOString().slice(0, 10);
+      // A stop scheduled for today that has not happened yet is not a missed stop.
+      // Coverage counts completed days only; today's records show in the list, not here.
+      if (dateStr >= todayStr) continue;
       for (const s of schedule) {
         if (s.weekday !== weekday) continue;
         total += 1;
@@ -107,47 +111,59 @@
   function render() {
     const filtered = allRecords.filter(matchesFilters).sort((a, b) => new Date(b.capturedAt) - new Date(a.capturedAt));
 
-    const q = qInput.value.trim();
     const from = fromInput.value;
     const to = toInput.value;
-    const fromLabel = from ? new Date(from + 'T00:00:00.000Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '';
-    const toLabel = to ? new Date(to + 'T00:00:00.000Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '';
-    const parts = [`${filtered.length} record${filtered.length === 1 ? '' : 's'}`];
-    if (q) parts.push(`"${q}"`);
-    if (from && to) parts.push(`${fromLabel} – ${toLabel}`);
-    el('summaryLine').textContent = parts.join(' · ');
 
     const cov = computeCoverage(from, to, statusSelect.value);
-    el('statCoverage').textContent = cov.pct === null ? '—' : `${cov.pct}%`;
-    el('statCoverageSub').textContent = cov.total ? `${cov.have} of ${cov.total} scheduled stops recorded` : '';
+    el('statCoverage').textContent = cov.pct === null ? '—' : `${cov.pct}% of scheduled stops recorded`;
 
     const secs = filtered.filter((r) => typeof r.captureMs === 'number').map((r) => r.captureMs / 1000);
     const med = median(secs);
-    el('statMedian').textContent = med === null ? '—' : `${med.toFixed(1)}s`;
-    el('statRecords').textContent = String(filtered.length);
+    el('statMedian').textContent = med === null ? '' : `${med.toFixed(1)}s median capture`;
+    el('statRecords').textContent = `${filtered.length} record${filtered.length === 1 ? '' : 's'}`;
+
+    const tbody = el('resultsTbody');
+    const list = el('resultsList');
 
     if (filtered.length === 0) {
-      results.innerHTML = '<div class="empty-state">No records for that address in this range — widen the dates.</div>';
+      tbody.innerHTML = '';
+      list.innerHTML = `<div class="empty-state">No records for that address in this range. Widen the dates.<span class="tagline">Collected · proof that the truck came</span></div>`;
       return;
     }
 
-    results.innerHTML = '';
+    tbody.innerHTML = '';
+    list.innerHTML = '';
+    const linkT0 = t0 || Date.now();
+
     for (const r of filtered) {
-      const linkT0 = t0 || Date.now();
-      const a = document.createElement('a');
-      a.className = 'result-row';
-      a.href = `/p/${r.id}?t0=${linkT0}`;
+      const href = `/p/${r.id}?t0=${linkT0}`;
       const d = new Date(r.capturedAt);
       const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
       const timeStr = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+      const captureStr = typeof r.captureMs === 'number' ? (r.captureMs / 1000).toFixed(1) + 's' : '—';
+      const statusLabel = STATUS_LABEL[r.status] || r.status;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><img class="thumb" src="${esc(r.photoUrl)}" loading="lazy" alt=""></td>
+        <td><a href="${href}">${esc(r.address)}</a></td>
+        <td class="mono">${esc(r.container || '—')}</td>
+        <td>${dateStr}, ${timeStr}</td>
+        <td><span class="badge ${r.status}">${statusLabel}</span></td>
+        <td class="mono">${captureStr}</td>`;
+      tr.addEventListener('click', (e) => {
+        if (e.target.closest('a')) return;
+        window.location.href = href;
+      });
+      tbody.appendChild(tr);
+
+      const a = document.createElement('a');
+      a.className = 'result-row';
+      a.href = href;
       a.innerHTML = `
-        <img class="result-thumb" src="${esc(r.photoUrl)}" loading="lazy" alt="">
-        <div class="result-main">
-          <div class="result-address">${esc(r.address)}</div>
-          <div class="result-meta">${esc(r.container || '—')} · ${dateStr} ${timeStr} · <span class="badge ${r.status}" style="padding:2px 8px; font-size:10px;">${STATUS_LABEL[r.status] || r.status}</span></div>
-          <div class="result-secs">${typeof r.captureMs === 'number' ? (r.captureMs / 1000).toFixed(1) + 's capture' : ''}</div>
-        </div>`;
-      results.appendChild(a);
+        <div class="result-address">${esc(r.address)}</div>
+        <div class="result-meta"><span class="mono">${esc(r.container || '—')}</span> · ${dateStr} ${timeStr} · <span class="badge ${r.status}">${statusLabel}</span> · <span class="mono">${captureStr}</span></div>`;
+      list.appendChild(a);
     }
   }
 

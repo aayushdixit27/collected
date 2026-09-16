@@ -3,6 +3,7 @@
     schedule: [],
     address: '',
     container: null,
+    stopSource: null, // 'route' | 'gps' | 'manual' | null
     photoBlob: null,
     status: 'collected',
     reason: null,
@@ -10,24 +11,35 @@
     gps: null, // {lat, lon, accuracyM}
     gpsFixed: false,
     t0: null,
+    capturedAt: null,
   };
 
   const el = (id) => document.getElementById(id);
-  const gpsDot = el('gpsDot');
-  const gpsText = el('gpsText');
-  const chipRow = el('chipRow');
-  const addressInput = el('addressInput');
-  const suggestions = el('suggestions');
-  const containerChipWrap = el('containerChipWrap');
-  const cameraWrap = el('cameraWrap');
+  const app = el('app');
+  const stopLineReady = el('stopLineReady');
+  const stopLinePhoto = el('stopLinePhoto');
+  const stopAddressReady = el('stopAddressReady');
+  const stopContainerReady = el('stopContainerReady');
+  const stopAddressPhoto = el('stopAddressPhoto');
+  const stopContainerPhoto = el('stopContainerPhoto');
+  const otherStopBtn = el('otherStopBtn');
   const cameraInput = el('cameraInput');
-  const statusRow = el('statusRow');
-  const reasonRow = el('reasonRow');
+  const photoFrame = el('photoFrame');
+  const retakeBtn = el('retakeBtn');
+  const saveBtn = el('saveBtn');
+  const reasonRowEl = el('reasonRow');
+  const statusRowEl = el('statusRow');
   const noteToggle = el('noteToggle');
   const noteInput = el('noteInput');
-  const saveBtn = el('saveBtn');
-  const captureView = el('captureView');
-  const confirmView = el('confirmView');
+  const couldNotDisclosure = el('couldNotDisclosure');
+  const stopDialog = el('stopDialog');
+  const stopFilterInput = el('stopFilterInput');
+  const stopDialogClose = el('stopDialogClose');
+  const stopList = el('stopList');
+
+  function esc(v) {
+    return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
 
   function markInteraction() {
     if (state.t0 === null) state.t0 = Date.now();
@@ -44,10 +56,9 @@
     return 2 * R * Math.asin(Math.sqrt(a));
   }
 
-  // ---- GPS ----
+  // ---- GPS (silent: no on-screen status until the saved screen) ----
   function setGpsUnavailable() {
-    gpsDot.className = 'gps-dot unavailable';
-    gpsText.textContent = 'GPS unavailable';
+    state.gpsFixed = false;
   }
   function setGpsFixed(pos) {
     state.gps = {
@@ -56,8 +67,6 @@
       accuracyM: Math.round(pos.coords.accuracy || 0),
     };
     state.gpsFixed = true;
-    gpsDot.className = 'gps-dot fixed';
-    gpsText.textContent = `GPS fixed ±${state.gps.accuracyM}m`;
     maybeAutoSelectNearest();
   }
 
@@ -71,8 +80,8 @@
     setGpsUnavailable();
   }
 
-  function maybeAutoSelectNearest() {
-    if (state.address || !state.gps || state.schedule.length === 0) return;
+  function computeNearest() {
+    if (!state.gps || state.schedule.length === 0) return null;
     let best = null;
     let bestDist = Infinity;
     for (const s of state.schedule) {
@@ -82,99 +91,127 @@
         best = s;
       }
     }
-    if (best && bestDist <= 300) selectStop(best);
+    return best && bestDist <= 300 ? best : null;
   }
 
-  // ---- schedule / chips ----
+  function maybeAutoSelectNearest() {
+    if (state.stopSource === 'manual') return;
+    // Once a photo exists the stop is part of the record; GPS drift must not change it.
+    if (app.dataset.state !== 'ready') return;
+    const nearest = computeNearest();
+    if (nearest) selectStop(nearest, 'gps');
+  }
+
+  // ---- schedule / stop selection ----
   function todayWeekday() {
     const d = new Date().getDay(); // 0 Sun .. 6 Sat
     return d === 0 ? 7 : d;
   }
 
-  function renderChips() {
+  function todaysStops() {
     const wd = todayWeekday();
-    const today = state.schedule.filter((s) => s.weekday === wd).sort((a, b) => a.routeOrder - b.routeOrder);
-    chipRow.innerHTML = '';
-    if (today.length === 0) {
-      chipRow.innerHTML = '<span style="color:var(--text-dim); font-size:13px;">No stops scheduled today — search by address or container.</span>';
-      return;
-    }
-    today.forEach((s) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'chip';
-      btn.innerHTML = `${s.address.split(',')[0]} <small>${s.container}</small>`;
-      btn.addEventListener('click', () => {
-        markInteraction();
-        selectStop(s);
-      });
-      chipRow.appendChild(btn);
-    });
+    return state.schedule.filter((s) => s.weekday === wd).sort((a, b) => a.routeOrder - b.routeOrder);
   }
 
-  function selectStop(stop) {
+  function updateStopViews() {
+    const addrText = state.address ? state.address.split(',')[0] : 'No stops today — tap to search';
+    stopAddressReady.textContent = addrText;
+    stopAddressPhoto.textContent = addrText;
+    stopContainerReady.textContent = state.container || '';
+    stopContainerPhoto.textContent = state.container || '';
+  }
+
+  function selectStop(stop, source) {
     state.address = stop.address;
-    state.container = stop.container;
-    addressInput.value = stop.address;
-    renderContainerChip();
-    suggestions.classList.add('hidden');
+    state.container = stop.container || null;
+    state.routeOrder = stop.routeOrder ?? null;
+    state.stopSource = source;
+    updateStopViews();
     updateSaveEnabled();
   }
 
-  function renderContainerChip() {
-    if (!state.container) {
-      containerChipWrap.innerHTML = '';
-      return;
-    }
-    containerChipWrap.innerHTML = `<span class="container-chip">${state.container} <button type="button" id="clearContainer" aria-label="Clear container">×</button></span>`;
-    el('clearContainer').addEventListener('click', () => {
-      state.container = null;
-      renderContainerChip();
-    });
+  function defaultToRouteStop() {
+    if (state.stopSource === 'manual') return;
+    const today = todaysStops();
+    if (today.length === 0) { updateStopViews(); return; }
+    // Next in route order after the last stop saved this session; the first stop otherwise.
+    const after = state.lastSavedRouteOrder;
+    const next = after == null ? today[0] : (today.find((s) => s.routeOrder > after) || today[0]);
+    selectStop(next, 'route');
   }
 
-  // ---- suggestions ----
-  addressInput.addEventListener('focus', markInteraction);
-  addressInput.addEventListener('input', () => {
+  // ---- stop overlay ----
+  function renderStopList() {
+    const q = stopFilterInput.value.trim().toLowerCase();
+    stopList.innerHTML = '';
+    if (q) {
+      const matches = state.schedule
+        .filter((s) => s.address.toLowerCase().includes(q) || s.container.toLowerCase().includes(q))
+        .slice(0, 20);
+      if (matches.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'stop-list-empty';
+        empty.textContent = 'No schedule match.';
+        stopList.appendChild(empty);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'stop-list-item';
+        btn.innerHTML = `<span class="addr">Use "${esc(stopFilterInput.value.trim())}" as address</span>`;
+        btn.addEventListener('click', () => {
+          selectStop({ address: stopFilterInput.value.trim(), container: null }, 'manual');
+          closeStopDialog();
+        });
+        stopList.appendChild(btn);
+        return;
+      }
+      matches.forEach((s) => appendStopItem(s, false));
+      return;
+    }
+    const today = todaysStops();
+    if (today.length === 0) {
+      stopList.innerHTML = '<div class="stop-list-empty">No stops scheduled today. Search above.</div>';
+      return;
+    }
+    const nearest = computeNearest();
+    today.forEach((s) => appendStopItem(s, !!nearest && nearest.address === s.address && nearest.container === s.container));
+  }
+
+  function appendStopItem(s, isNearest) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'stop-list-item';
+    btn.innerHTML = `<span class="addr">${esc(s.address.split(',')[0])}${isNearest ? ' <span class="nearest-tag">· Nearest</span>' : ''}</span><span class="meta">${esc(s.container)}</span>`;
+    btn.addEventListener('click', () => {
+      selectStop(s, 'manual');
+      closeStopDialog();
+    });
+    stopList.appendChild(btn);
+  }
+
+  function openStopDialog() {
     markInteraction();
-    state.address = addressInput.value;
-    updateSaveEnabled();
-    const q = addressInput.value.trim().toLowerCase();
-    if (!q) {
-      suggestions.classList.add('hidden');
-      return;
-    }
-    const matches = state.schedule
-      .filter((s) => s.address.toLowerCase().includes(q) || s.container.toLowerCase().includes(q))
-      .slice(0, 6);
-    if (matches.length === 0) {
-      suggestions.classList.add('hidden');
-      return;
-    }
-    suggestions.innerHTML = '';
-    matches.forEach((s) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = `${s.address} — ${s.container}`;
-      btn.addEventListener('click', () => selectStop(s));
-      suggestions.appendChild(btn);
-    });
-    suggestions.classList.remove('hidden');
-  });
+    stopFilterInput.value = '';
+    renderStopList();
+    stopDialog.showModal();
+    setTimeout(() => stopFilterInput.focus(), 0);
+  }
+  function closeStopDialog() {
+    stopDialog.close();
+  }
+
+  stopLineReady.addEventListener('click', openStopDialog);
+  stopLinePhoto.addEventListener('click', openStopDialog);
+  otherStopBtn.addEventListener('click', openStopDialog);
+  stopDialogClose.addEventListener('click', closeStopDialog);
+  stopFilterInput.addEventListener('input', renderStopList);
 
   // ---- camera / downscale ----
-  function resetCamera() {
-    state.photoBlob = null;
-    cameraWrap.innerHTML = `<label class="camera-btn" id="cameraBtn">📷 Take photo<input id="cameraInput" type="file" accept="image/*" capture="environment"></label>`;
-    rewireCameraInput();
-    updateSaveEnabled();
-  }
-
-  function rewireCameraInput() {
-    const input = document.getElementById('cameraInput');
-    input.addEventListener('click', markInteraction);
-    input.addEventListener('change', cameraChangeHandler);
-  }
+  cameraInput.addEventListener('click', markInteraction);
+  cameraInput.addEventListener('change', cameraChangeHandler);
+  retakeBtn.addEventListener('click', () => {
+    markInteraction();
+    cameraInput.click();
+  });
 
   async function cameraChangeHandler(e) {
     const file = e.target.files && e.target.files[0];
@@ -188,9 +225,10 @@
     }
     state.photoBlob = blob;
     const url = URL.createObjectURL(blob);
-    cameraWrap.innerHTML = `<img class="photo-preview" src="${url}" alt="Captured photo"><button type="button" class="retake" id="retakeBtn">Retake photo</button>`;
-    el('retakeBtn').addEventListener('click', resetCamera);
+    photoFrame.innerHTML = `<img src="${url}" alt="Captured photo">`;
+    app.dataset.state = 'photo';
     updateSaveEnabled();
+    e.target.value = ''; // allow re-selecting the same file on a retake
   }
 
   function downscaleImage(file, maxEdge, quality) {
@@ -226,22 +264,25 @@
     });
   }
 
-  // ---- status / reason chips ----
-  statusRow.addEventListener('click', (e) => {
+  // ---- could-not-service disclosure: reasons + delivered/removed ----
+  reasonRowEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-reason]');
+    if (!btn) return;
+    markInteraction();
+    state.status = 'not_collected';
+    state.reason = btn.dataset.reason;
+    [...reasonRowEl.children].forEach((c) => c.classList.toggle('selected', c === btn));
+    [...statusRowEl.children].forEach((c) => c.classList.remove('selected'));
+  });
+
+  statusRowEl.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-status]');
     if (!btn) return;
     markInteraction();
     state.status = btn.dataset.status;
-    [...statusRow.children].forEach((c) => c.classList.toggle('selected', c === btn));
-    reasonRow.classList.toggle('hidden', state.status !== 'not_collected');
-    if (state.status !== 'not_collected') state.reason = null;
-  });
-
-  reasonRow.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-reason]');
-    if (!btn) return;
-    state.reason = btn.dataset.reason;
-    [...reasonRow.children].forEach((c) => c.classList.toggle('selected', c === btn));
+    state.reason = null;
+    [...statusRowEl.children].forEach((c) => c.classList.toggle('selected', c === btn));
+    [...reasonRowEl.children].forEach((c) => c.classList.remove('selected'));
   });
 
   // ---- note ----
@@ -313,7 +354,7 @@
       });
       if (!res.ok) throw new Error('save failed');
       const data = await res.json();
-      showConfirm(data.url, captureMs);
+      showSaved(data.url, captureMs, !!payload.gps);
     } catch (err) {
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save';
@@ -321,11 +362,12 @@
     }
   });
 
-  function showConfirm(url, ms) {
-    captureView.classList.add('hidden');
-    confirmView.classList.remove('hidden');
+  function showSaved(url, ms, hadGps) {
+    app.dataset.state = 'saved';
+    if (state.routeOrder != null) state.lastSavedRouteOrder = state.routeOrder;
     el('elapsedText').textContent = `Recorded in ${(ms / 1000).toFixed(1)}s`;
     el('proofUrlText').textContent = location.origin + url;
+    el('gpsWarning').classList.toggle('hidden', hadGps);
     el('copyLinkBtn').onclick = () => {
       navigator.clipboard?.writeText(location.origin + url);
       el('copyLinkBtn').textContent = 'Copied';
@@ -342,36 +384,34 @@
   function resetForm() {
     state.address = '';
     state.container = null;
+    state.stopSource = null;
     state.photoBlob = null;
     state.status = 'collected';
     state.reason = null;
     state.note = '';
     state.t0 = null;
-    addressInput.value = '';
+    state.capturedAt = null;
     noteInput.value = '';
     noteInput.classList.add('hidden');
-    reasonRow.classList.add('hidden');
-    [...statusRow.children].forEach((c) => c.classList.toggle('selected', c.dataset.status === 'collected'));
-    renderContainerChip();
-    resetCamera();
+    couldNotDisclosure.open = false;
+    [...reasonRowEl.children, ...statusRowEl.children].forEach((c) => c.classList.remove('selected'));
+    photoFrame.innerHTML = '';
     saveBtn.disabled = true;
     saveBtn.textContent = 'Save';
-    confirmView.classList.add('hidden');
-    captureView.classList.remove('hidden');
+    app.dataset.state = 'ready';
+    defaultToRouteStop();
     maybeAutoSelectNearest();
   }
-
-  // wire the initial camera input (the one in the HTML) once DOM is ready
-  rewireCameraInput();
 
   fetch('/api/schedule')
     .then((r) => r.json())
     .then((data) => {
       state.schedule = data.stops || [];
-      renderChips();
+      defaultToRouteStop();
       maybeAutoSelectNearest();
     })
     .catch(() => {
-      chipRow.innerHTML = '<span style="color:var(--red); font-size:13px;">Could not load schedule.</span>';
+      stopAddressReady.textContent = 'Could not load schedule.';
+      stopAddressPhoto.textContent = 'Could not load schedule.';
     });
 })();

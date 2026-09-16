@@ -152,10 +152,15 @@ export function generateSeedRecords(schedule, seedTimeMs = Date.now(), seed = RE
       const skip = !isPinned && rand() < 0.08;
       if (skip) return;
 
+
       const minuteOffset = Math.round(idx * gap + rand() * gap * 0.6);
       const minutes = Math.min(endMin, startMin + minuteOffset);
       // Route times are the stop's local wall-clock; cursor is UTC midnight of that date.
       const capturedAt = new Date(cursor + (minutes + stop.utcOffsetMin) * 60000 + Math.floor(rand() * 59) * 1000).toISOString();
+
+      // Never seed a stop that has not happened yet: a record from the future would sort
+      // ahead of a real capture made right now.
+      if (!isPinned && Date.parse(capturedAt) > seedTimeMs) return;
 
       const { status, reason } = isPinned ? { status: 'collected', reason: null } : pickStatus(rand);
       const captureMs = Math.round(4200 + rand() * 7600);

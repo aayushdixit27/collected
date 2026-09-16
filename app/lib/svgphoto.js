@@ -16,14 +16,13 @@ export function renderPhotoSvg(record) {
   const H = 300;
   const hour = new Date(record.capturedAt).getUTCHours();
 
-  let sky1 = '#8ec9f0';
-  let sky2 = '#cfe9fb';
+  // Three flat sky bands by time of day. No gradient: DESIGN.md bans them everywhere,
+  // including inside the synthetic demo photo.
+  let sky = '#bcd6e8'; // day
   if (hour < 7) {
-    sky1 = '#e8a15a';
-    sky2 = '#f6d9a6';
+    sky = '#e2b98a'; // dawn
   } else if (hour >= 13) {
-    sky1 = '#f3b26a';
-    sky2 = '#fbe3bd';
+    sky = '#d9c39a'; // late
   }
 
   const kind = (record.container || 'CT').split('-')[0];
@@ -57,10 +56,7 @@ export function renderPhotoSvg(record) {
   // and a stamp in the pixels can only ever agree with it or contradict it.
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
-<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-<stop offset="0" stop-color="${sky1}"/><stop offset="1" stop-color="${sky2}"/>
-</linearGradient></defs>
-<rect width="${W}" height="${H}" fill="url(#sky)"/>
+<rect width="${W}" height="${H}" fill="${sky}"/>
 <rect y="190" width="${W}" height="${H - 190}" fill="#6b6b6b"/>
 <rect y="190" width="${W}" height="6" fill="#8a8a8a"/>
 ${binShape}

@@ -8,10 +8,13 @@
 </head>
 <body>
 <div class="wrap-wide">
-  <p class="brand"><b>Collected</b> · office retrieval</p>
+  <p class="brand-mark office-header">Collected</p>
 
   <div class="office-controls">
-    <input id="qInput" class="field" type="text" placeholder="Search address or container ID">
+    <div class="field-icon-wrap search-wrap">
+      <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="qInput" class="field" type="text" placeholder="Search address or container ID">
+    </div>
     <div class="row2">
       <input id="fromInput" class="field" type="date">
       <input id="toInput" class="field" type="date">
@@ -25,25 +28,26 @@
     </select>
   </div>
 
-  <div id="summaryLine" class="summary-line"></div>
+  <p class="stat-line">
+    <span class="stat-north" id="statCoverage">—</span><span class="stat-sub" id="statRecords">—</span><span class="stat-sub" id="statMedian">—</span>
+  </p>
 
-  <div class="stat-strip">
-    <div class="stat-card">
-      <div class="num" id="statCoverage">—</div>
-      <div class="label">Coverage</div>
-      <div class="sub" id="statCoverageSub"></div>
-    </div>
-    <div class="stat-card">
-      <div class="num" id="statMedian">—</div>
-      <div class="label">Median capture</div>
-    </div>
-    <div class="stat-card">
-      <div class="num" id="statRecords">—</div>
-      <div class="label">Records</div>
-    </div>
+  <div id="results">
+    <table class="results-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Address</th>
+          <th>Container</th>
+          <th>Date, time</th>
+          <th>Status</th>
+          <th>Capture</th>
+        </tr>
+      </thead>
+      <tbody id="resultsTbody"></tbody>
+    </table>
+    <div class="results-list" id="resultsList"></div>
   </div>
-
-  <div id="results"></div>
 
   <a class="footer-link" href="/">Driver capture</a>
 </div>
