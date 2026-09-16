@@ -150,14 +150,18 @@ Measured timings, honestly labelled:
 
 | Run | Capture | Retrieve |
 |---|---|---|
-| Live URL, browser automation (a floor) | 4.2 s | 2.2 – 10.8 s |
-| Desktop Chrome, human-paced | 8.8 s | 12.8 s |
-| Real phone, one capture | **25.1 s** | — |
+| Live URL, browser automation (a floor) — first UI | 4.2 s | 2.2 – 10.8 s |
+| Live URL, browser automation — redesigned UI | 2.5 s | 2.2 s |
+| Desktop Chrome, human-paced — first UI | 8.8 s | 12.8 s |
+| Real phone, first UI, two captures | **25.1 s, 25.5 s** | — |
+| Real phone, redesigned UI | *not yet measured* | — |
 
-The 25.1 s is one real capture from a phone by someone using the screen for the first time.
-It is over the target by a factor of two and a half, and it is the most important number on
-this page, because the entire product rests on whether a driver will do this forty times a
-day. Not hidden.
+The two phone numbers are real captures by someone using the screen for the first time, on
+the first version of the interface. They are over the target by a factor of two and a half,
+and they are the most important numbers on this page, because the entire product rests on
+whether a driver will do this forty times a day. The interface was redesigned in response
+(one screen state, one action, the stop pre-selected); whether that moved the phone number
+is not yet known. Not hidden.
 
 **The one thing this will not trade:** capture speed. If a new field improves the record but
 pushes capture past ten seconds, the field loses.
