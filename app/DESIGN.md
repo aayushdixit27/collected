@@ -1,5 +1,11 @@
 # DESIGN.md — Collected
 
+> **Correction, 15 Sep 2026 (late).** The first version of §4's capture contract said "nothing
+> else is visible above the fold" and produced a page with one line and one button that the
+> user could not identify as an app. It was reverted. §2 and §4 below are rewritten for the
+> screens that worked: the dark tools keep their structure and get their failing pairs fixed;
+> the proof page alone is a light document. The readability floor in §1 is unchanged.
+
 The design decisions, made once, here, so that no screen has to make them again. Every
 rule below is a transfer of thinking from the person in the truck cab, or at the office
 desk, to this file. If a screen and this file disagree, the screen is wrong.
@@ -25,9 +31,21 @@ pair must clear 7:1 (AAA for body text).** Nothing decorative is allowed to lowe
 | `#7F1D1D` on `#FEE2E2` | 8.2 | Could-not-service badge |
 | `#1E3A5F` on `#DBEAFE` | 9.4 | Delivered / Removed badge |
 | warning `#9A1B1B` on paper | 8.3 | GPS distance warning |
+| **Dark tools (capture, office)** | | |
+| text `#f4f6f7` on bg `#0b0d0f` | 18.0 | body |
+| dim `#a7b0b6` on bg / on surface `#16191c` | 8.8 / 8.0 | labels, metadata |
+| placeholder `#b9c2c8` on surface | 9.8 | input placeholders |
+| accent-text `#14181b` on accent `#10d6e6` (TrashLab cyan) | 10.0 | the primary action |
+| accent-text on green `#33c26a` / red `#ff8080` / grey `#b9c2c8` | 7.7 / 7.4 / 9.9 | status badges, solid |
+| dim on surface-2 `#1f2327` | 7.2 | disabled Save |
+| red `#ff8080` on bg / surface | 8.0 / 7.3 | GPS-missing line |
+| **Document (proof page)** | | |
+| TrashLab indigo `#2F2A90` on paper | 11.3 | the one link colour |
 
 Rejected for failing the floor: safety orange `#C2410C` as accent (5.2 with white text),
-mid-grey `#6B6B6B` placeholders (5.3). Both *look* fine. That is the trap.
+mid-grey `#6B6B6B` placeholders (5.3), the old grey placeholder `#8a949b` on surface (5.7),
+the old red `#ff5c5c` (6.4), translucent badge tints (4.0–6.0), and any disabled state done
+with `opacity` (measured 2.08). All of them *look* fine. That is the trap.
 
 Minimum sizes: body 17px on phone, 16px on desktop; secondary and table text 14px, never
 below; labels 13px semibold, never 11–12px tracked caps in grey. Line height 1.45. Max
@@ -35,13 +53,29 @@ measure 68 characters on the proof page.
 
 ## 2. Tokens
 
+Two sets, on purpose. The tools are dark (the screens that worked; drivers asked for nothing
+else and the pairs clear the floor). The document is paper.
+
+**Tools (capture, office)** — `public/app.css`
+```
+--bg #0b0d0f · --surface #16191c · --surface-2 #1f2327 · --border #2c3136 (never text)
+--text #f4f6f7 · --text-dim #a7b0b6 · --placeholder #b9c2c8
+--accent #10d6e6 (TrashLab cyan; the primary action and nothing else) · --accent-text #14181b
+--green #33c26a · --red #ff8080 · badges are solid: accent-text on the colour
+--radius 10px on inputs and buttons; chips and badges are pills
+```
+
+**Document (proof page)** — `public/proof.css`, the light set below, with `--accent #2F2A90`
+(TrashLab indigo) as the single link colour.
+
+
 ```
 --paper:      #FFFFFF   page background (tools and document)
 --surface:    #F4F2EE   panels, input backgrounds, table header
 --rule:       #C9C5BC   hairlines and input borders — never text
 --ink:        #111111   text
 --ink-2:      #444444   secondary text
---accent:     #1B4D3E   ONE use: the primary action. Nothing else is this colour.
+--accent:     #2F2A90   TrashLab indigo. ONE use: the document's link colour. (was #1B4D3E)
 --accent-ink: #FFFFFF
 --ok-bg/-fg:  #DCFCE7 / #14532D
 --bad-bg/-fg: #FEE2E2 / #7F1D1D
@@ -80,22 +114,22 @@ in plain words: "Saved without a location fix."
 
 ## 4. Screen contracts
 
-### Capture (`/`) — a tool. Three states, one dominant action each.
+### Capture (`/`) — a tool. Keep the structure that worked.
 
-- **Ready.** Line 1, large: the stop the app thinks you are at (nearest within 300 m by
-  GPS, else next in route order), tappable to change; changing opens the stop list *over*
-  the screen, never inline. Line 2: the container, mono. Then the camera button: full
-  width, 120px tall, accent green, white text "Take photo", the camera icon. Nothing else
-  is visible above the fold except a quiet "Other stop…" text button.
-- **Photo taken.** The photo fills the top ~45 %. Under it the stop line (still tappable).
-  Then Save: full width, accent, the *only* green thing now (the camera button is gone,
-  replaced by a small "Retake" text button). Below Save, quiet: "Could not service ▸" which
-  reveals the four reasons as plain rectangles; "Add a note". Status chips for Delivered /
-  Removed live behind the same disclosure, not on the main path.
-- **Saved.** "Recorded in 6.4 s" as the largest text on the page. The link in mono. Three
-  equal buttons: Copy link · Share · Next stop. If GPS was missing: one line, warning
-  colour, "Saved without a location fix." That is the only place GPS status appears.
-- No form labels. No header tagline. The word "Collected" once, small, top-left.
+Top to bottom, every element a signifier or a label: brand line with the purpose (identity,
+once) · **route line** "Tuesday route · stop 3 of 6" (place) · TODAY'S STOPS chips, one
+scrolling row · ADDRESS OR CONTAINER ID input with a readable placeholder · PHOTO: a dashed
+frame with the camera icon and "Take photo" (the frame says what goes there) · STATUS chips,
+Collected pre-selected · "+ add note" · **Save**, full width, the one accent element when
+enabled, a solid dim pair when disabled (anchor) · a single footer link. Fits 390×844 with
+no scroll. Nothing about GPS on this screen.
+
+Confirmation replaces the form: check icon, "Recorded in 6.4 s" largest, the link, Copy
+link · Share · Next stop. **GPS is mentioned here only, and only if missing:** "Saved without
+a location fix."
+
+Step 3b named: signifiers (chips, input, dashed frame, button), place (route line), regions
+(five labelled sections), anchor (Save at the bottom of the form), identity (brand line).
 
 ### Proof page (`/p/:id`) — a document.
 

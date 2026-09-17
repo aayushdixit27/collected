@@ -2,66 +2,95 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Collected — capture</title>
 <link rel="stylesheet" href="/app.css">
 </head>
-<body>
-<div class="wrap">
-  <p class="brand"><b>Collected</b> · proof that the truck came</p>
+<body class="capture-body">
+<main class="phone" id="app">
 
-  <div id="captureView">
-    <div class="gps-row"><span id="gpsDot" class="gps-dot"></span><span id="gpsText">Finding GPS…</span></div>
+  <!-- Capture view -->
+  <section id="captureView" class="cap">
+    <header class="cap-top">
+      <span class="wordmark">Collected</span>
+      <span class="cap-day" id="dayLine">—</span>
+    </header>
 
-    <div class="section-label">Today's stops</div>
-    <div id="chipRow" class="chip-row scroll"><span style="color:var(--text-dim); font-size:13px;">Loading schedule…</span></div>
+    <div class="cap-route">
+      <div class="cap-route-row"><span id="routePos">—</span><span id="routeDone"></span></div>
+      <div class="segs" id="routeSegs"></div>
+    </div>
 
-    <div class="section-label">Address or container ID</div>
-    <input id="addressInput" class="field" type="text" placeholder="Start typing an address or container ID" autocomplete="off">
-    <div id="suggestions" class="suggestions hidden"></div>
-    <div id="containerChipWrap"></div>
+    <button type="button" class="stop-card" id="stopCard" aria-haspopup="dialog">
+      <span class="stop-card-text">
+        <span class="k">This stop</span>
+        <span class="addr" id="stopAddr">Choose a stop</span>
+        <span class="meta" id="stopMeta">Tap to pick from today's route or search</span>
+      </span>
+      <span class="chev" aria-hidden="true">›</span>
+    </button>
 
-    <div class="section-label">Photo</div>
-    <div id="cameraWrap">
-      <label class="camera-btn" id="cameraBtn">
-        📷 Take photo
+    <div class="hero" id="heroWrap">
+      <label class="hero-label" id="cameraBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <span class="t">Take photo</span>
+        <span class="s">Container and access, from the cab</span>
         <input id="cameraInput" type="file" accept="image/*" capture="environment">
       </label>
     </div>
 
-    <div class="section-label">Status</div>
-    <div id="statusRow" class="chip-row">
-      <button type="button" class="chip selected" data-status="collected">Collected</button>
-      <button type="button" class="chip" data-status="delivered">Delivered</button>
-      <button type="button" class="chip" data-status="removed">Removed</button>
-      <button type="button" class="chip" data-status="not_collected">Could not collect</button>
+    <div class="cap-status">
+      <div class="k">Status</div>
+      <div class="segctl" id="statusRow" role="radiogroup" aria-label="Status">
+        <button type="button" data-status="collected" class="on" role="radio" aria-checked="true">Collected</button>
+        <button type="button" data-status="delivered" role="radio" aria-checked="false">Delivered</button>
+        <button type="button" data-status="removed" role="radio" aria-checked="false">Removed</button>
+        <button type="button" data-status="not_collected" role="radio" aria-checked="false">Couldn't</button>
+      </div>
+      <div class="reasons hidden" id="reasonRow">
+        <button type="button" data-reason="blocked_access">Blocked access</button>
+        <button type="button" data-reason="overfilled">Overfilled</button>
+        <button type="button" data-reason="contaminated">Contaminated</button>
+        <button type="button" data-reason="not_out">Not out</button>
+      </div>
     </div>
-    <div id="reasonRow" class="chip-row hidden">
-      <button type="button" class="chip small" data-reason="blocked_access">Blocked access</button>
-      <button type="button" class="chip small" data-reason="overfilled">Overfilled</button>
-      <button type="button" class="chip small" data-reason="contaminated">Contaminated</button>
-      <button type="button" class="chip small" data-reason="not_out">Not out</button>
+
+    <div class="cap-note">
+      <button type="button" class="note-toggle" id="noteToggle">+ Add a note</button>
+      <input id="noteInput" class="field hidden" type="text" maxlength="140" placeholder="Note (optional)">
     </div>
 
-    <button type="button" id="noteToggle" class="note-toggle">+ add note</button>
-    <input id="noteInput" class="field hidden" type="text" maxlength="140" placeholder="Note (optional)">
+    <div class="cap-bar">
+      <button type="button" id="saveBtn" class="save" disabled>Save record</button>
+    </div>
+  </section>
 
-    <button type="button" id="saveBtn" class="btn-primary" disabled>Save</button>
-  </div>
-
-  <div id="confirmView" class="confirm hidden">
-    <div class="check">✓</div>
-    <div class="elapsed" id="elapsedText">Recorded in 0.0s</div>
+  <!-- Saved view -->
+  <section id="confirmView" class="confirm hidden">
+    <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5 5L20 7"/></svg></div>
+    <div class="elapsed" id="elapsedText">Recorded</div>
+    <div class="saved-stop" id="savedStop"></div>
     <div class="url" id="proofUrlText"></div>
+    <div class="gps-warning hidden" id="gpsWarning">Saved without a location fix.</div>
     <div class="btn-row">
       <button type="button" id="copyLinkBtn" class="btn-secondary">Copy link</button>
       <button type="button" id="shareBtn" class="btn-secondary hidden">Share</button>
-      <button type="button" id="nextStopBtn" class="btn-primary" style="margin-top:0;">Next stop</button>
     </div>
-  </div>
+    <button type="button" id="nextStopBtn" class="save">Next stop</button>
+    <a class="footer-link" href="/office">Office view</a>
+  </section>
 
-  <a class="footer-link" href="/office">Office view</a>
-</div>
+  <!-- Stop picker -->
+  <dialog class="picker" id="stopDialog" aria-label="Choose a stop">
+    <div class="picker-head">
+      <input id="addressInput" class="field" type="search" placeholder="Search address or container ID" autocomplete="off">
+      <button type="button" class="picker-close" id="pickerClose" aria-label="Close">×</button>
+    </div>
+    <div class="picker-k" id="pickerLabel">Today's route</div>
+    <div class="picker-list" id="stopList"></div>
+  </dialog>
+
+</main>
 <script src="/capture.js"></script>
 </body>
 </html>

@@ -84,7 +84,7 @@
     el('ddAddress').textContent = record.address;
     el('ddContainer').textContent = record.container || '—';
 
-    el('ddCaptured').innerHTML = `${fmtCaptured(record.capturedAt)}<br><span class="mono" style="font-size:12px; color:var(--text-dim);">${record.capturedAt}</span>`;
+    el('ddCaptured').innerHTML = `${fmtCaptured(record.capturedAt)}<span class="captured-iso mono">${record.capturedAt}</span>`;
 
     if (record.gps) {
       el('locText').textContent = `${record.gps.lat.toFixed(5)}, ${record.gps.lon.toFixed(5)} ± ${record.gps.accuracyM ?? '?'}m`;
@@ -108,21 +108,17 @@
         if (!stop) return;
         const km = haversineKm(record.gps.lat, record.gps.lon, stop.lat, stop.lon);
         if (km > 1) {
-          const warn = document.createElement('div');
-          warn.className = 'loc-warn';
-          warn.textContent = `Fix is ${km < 10 ? km.toFixed(1) : Math.round(km)} km from this stop's scheduled location.`;
-          el('locText').after(warn);
+          el('locWarn').className = 'loc-warn';
+          el('locWarn').textContent = `Fix is ${km < 10 ? km.toFixed(1) : Math.round(km)} km from this stop's scheduled location.`;
         }
       }).catch(() => {});
     } else {
       el('locText').textContent = 'No GPS fix at capture';
     }
 
-    if (record.note) {
-      el('dtNote').classList.remove('hidden');
-      el('ddNote').classList.remove('hidden');
-      el('ddNote').textContent = record.note;
-    }
+    // Every row is present on the document, including an empty note, so a print is complete.
+    el('rowNote').classList.remove('hidden');
+    el('ddNote').textContent = record.note || '—';
 
     el('ddId').textContent = record.id;
     el('ddReceived').textContent = record.receivedAt;
