@@ -72,7 +72,7 @@ export default async function handler(req, res) {
       sendJson(res, 400, { error: 'photo must be base64-encoded' });
       return;
     }
-    if (buf.length === 0 || buf.length > 3 * 1024 * 1024) {
+    if (buf.length === 0 || buf.length > 3 * 1024 * 1024 || buf[0] !== 0xff || buf[1] !== 0xd8) {
       sendJson(res, 400, { error: 'photo must be a non-empty JPEG under 3MB decoded' });
       return;
     }

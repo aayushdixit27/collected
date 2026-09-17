@@ -44,6 +44,12 @@ export default async function handler(req, res) {
     sendJson(res, 409, { error: 'ticket already recorded for this record' });
     return;
   }
+  // A ticket only makes sense where a load was hauled. A charge under "Could not collect"
+  // is the kind of page that loses the dispute.
+  if (record.status !== 'collected' && record.status !== 'removed') {
+    sendJson(res, 400, { error: 'a ticket can only be tied to a collected or removed pull' });
+    return;
+  }
 
   let body;
   try {
@@ -67,7 +73,7 @@ export default async function handler(req, res) {
     sendJson(res, 400, { error: 'photo must be base64-encoded' });
     return;
   }
-  if (buf.length === 0 || buf.length > 3 * 1024 * 1024) {
+  if (buf.length === 0 || buf.length > 3 * 1024 * 1024 || buf[0] !== 0xff || buf[1] !== 0xd8) {
     sendJson(res, 400, { error: 'photo must be a non-empty JPEG under 3MB decoded' });
     return;
   }
@@ -76,16 +82,23 @@ export default async function handler(req, res) {
     sendJson(res, 400, { error: 'netLb is required and must be an integer between 1 and 80000' });
     return;
   }
-  if (grossLb !== undefined && grossLb !== null && typeof grossLb !== 'number') {
-    sendJson(res, 400, { error: 'grossLb must be a number' });
+  const lbOk = (v) => v === undefined || v === null || (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 80000);
+  if (!lbOk(grossLb) || !lbOk(tareLb)) {
+    sendJson(res, 400, { error: 'grossLb and tareLb must be integers between 1 and 80000' });
     return;
   }
-  if (tareLb !== undefined && tareLb !== null && typeof tareLb !== 'number') {
-    sendJson(res, 400, { error: 'tareLb must be a number' });
-    return;
+  if (weighedAt !== undefined && weighedAt !== null) {
+    const t = Date.parse(weighedAt);
+    const captured = Date.parse(record.capturedAt);
+    // A ticket is weighed after the pull, not before it and not in the future.
+    if (Number.isNaN(t) || t < captured - 3600000 || t > Date.now() + 3600000) {
+      sendJson(res, 400, { error: 'weighedAt must be a valid time after the pickup and not in the future' });
+      return;
+    }
   }
-  if (weighedAt !== undefined && weighedAt !== null && Number.isNaN(Date.parse(weighedAt))) {
-    sendJson(res, 400, { error: 'weighedAt must be a valid date' });
+  const gpsOk = !gps || (typeof gps.lat === 'number' && typeof gps.lon === 'number' && Math.abs(gps.lat) <= 90 && Math.abs(gps.lon) <= 180);
+  if (!gpsOk) {
+    sendJson(res, 400, { error: 'gps must carry a latitude and longitude in range' });
     return;
   }
 
