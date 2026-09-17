@@ -570,7 +570,7 @@
           // Some other path already ticketed this pull; stop counting it as awaiting
           // instead of leaving the row stale until the next full reload.
           const rec409 = state.todayRecords.find((r) => r.id === ticketState.recordId);
-          if (rec409) rec409.ticket = true; // placeholder — real shape unknown here, just stops the awaiting count
+          if (rec409) rec409.ticket = true; // the server has one; a reload would fetch it. Truthy is enough to drop it from the awaiting count.
           renderAwaiting();
         }
         ticketSaveBtn.disabled = false;
