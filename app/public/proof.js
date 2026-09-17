@@ -132,67 +132,6 @@
       return;
     }
     const record = await res.json();
-
-    // TEMP FIXTURE (lane-3, remove before final)
-    const demo = params.get('demo');
-    if (demo) {
-      const TICKET_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="560" viewBox="0 0 420 560">
-<rect width="420" height="560" fill="#EDE9E0"/>
-<rect x="34" y="28" width="352" height="504" fill="#FBFAF6" stroke="#CFC9BC"/>
-<g font-family="Menlo, Consolas, monospace" fill="#2A2724" font-size="14">
-<text x="60" y="70" font-size="15" font-weight="700">ZANKER ROAD TRANSFER STATION</text>
-<text x="60" y="92">705 Los Esteros Rd, San Jose CA</text>
-<text x="60" y="130">TICKET NO   0417723</text>
-<text x="60" y="152">DATE        08/12/2026</text>
-<text x="60" y="174">TIME IN     07:41</text>
-<text x="60" y="196">MATERIAL    C&amp;D MIXED</text>
-<text x="60" y="218">TRUCK       T-18</text>
-<line x1="60" y1="244" x2="360" y2="244" stroke="#2A2724" stroke-dasharray="2 3"/>
-<text x="60" y="282">GROSS          19860 LB</text>
-<text x="60" y="308">TARE           14520 LB</text>
-<text x="60" y="334" font-weight="700">NET             5340 LB</text>
-<line x1="60" y1="360" x2="360" y2="360" stroke="#2A2724" stroke-dasharray="2 3"/>
-<text x="60" y="400">SCALE 2  OPERATOR 14</text>
-<text x="60" y="422">TONS 2.67</text>
-<text x="60" y="490" font-size="12" fill="#6B655C">CUSTOMER COPY</text>
-</g></svg>`;
-      // Brief specified `data:image/svg+xml;utf8,` with only `#`->`%23` encoded, but that
-      // shorthand does not render in this Chrome build (tested in isolation: blank/broken
-      // image). Using a fully percent-encoded data URI instead, which renders correctly.
-      const ticketPhotoUrl = 'data:image/svg+xml,' + encodeURIComponent(TICKET_SVG);
-      const weighedAt = new Date(Date.parse(record.capturedAt) + 65 * 60000).toISOString();
-      const basePricing = { includedLb: 2000, ratePerTon: 95 };
-
-      if (demo === 'noticket') {
-        record.ticket = null;
-      } else if (demo === 'zero') {
-        record.ticket = {
-          photoUrl: ticketPhotoUrl,
-          netLb: 1800,
-          grossLb: 19860,
-          tareLb: null,
-          facility: 'Zanker Road Transfer Station',
-          weighedAt,
-          gps: null,
-          ticketMs: 6200,
-        };
-        record.pricing = basePricing;
-      } else if (demo === 'ticket') {
-        record.ticket = {
-          photoUrl: ticketPhotoUrl,
-          netLb: 5340,
-          grossLb: 19860,
-          tareLb: 14520,
-          facility: 'Zanker Road Transfer Station',
-          weighedAt,
-          gps: null,
-          ticketMs: 6200,
-        };
-        record.pricing = basePricing;
-      }
-    }
-    // END TEMP FIXTURE
-
     render(record);
   }
 
