@@ -33,6 +33,38 @@
     not_collected: 'Could not collect',
   };
 
+  // DEMO-FIXTURE: lane-1's ticket field is not on records on this branch yet. Active only
+  // with ?demo=ticket in the URL; remove this whole block before final.
+  function isDemoTicket() { return location.search.indexOf('demo=ticket') !== -1; } // DEMO-FIXTURE
+  function fixtureHash(id) { // DEMO-FIXTURE: small deterministic hash, keyed by record id
+    let h = 0; // DEMO-FIXTURE
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; // DEMO-FIXTURE
+    return h; // DEMO-FIXTURE
+  }
+  function decorateWithFixtureTickets(records) { // DEMO-FIXTURE
+    return records.map((r) => { // DEMO-FIXTURE
+      const isRoCollected = r.status === 'collected' && r.container && r.container.startsWith('RO-'); // DEMO-FIXTURE
+      if (!isRoCollected || r.ticket) return r; // DEMO-FIXTURE
+      const h = fixtureHash(r.id); // DEMO-FIXTURE
+      if (h % 100 >= 75) return r; // DEMO-FIXTURE: ~25% left without a ticket
+      const netLb = 1200 + (h % 6601); // DEMO-FIXTURE: 1,200..7,800 lb
+      return { ...r, ticket: { netLb } }; // DEMO-FIXTURE
+    });
+  }
+
+  function ticketSuffix(r) {
+    if (r.ticket && typeof r.ticket.netLb === 'number') {
+      return ` · ticket ${r.ticket.netLb.toLocaleString()} lb`;
+    }
+    if (r.status === 'collected' && r.container && r.container.startsWith('RO-')) {
+      return ' <span class="no-ticket">· no ticket</span>';
+    }
+    return '';
+  }
+  function missingTicket(r) {
+    return r.status === 'collected' && !!r.container && r.container.startsWith('RO-') && !r.ticket;
+  }
+
   function debounce(fn, ms) {
     let t;
     return (...args) => {
@@ -64,7 +96,9 @@
     if (from && d < from) return false;
     if (to && d > to) return false;
     const status = statusSelect.value;
-    if (status && r.status !== status) return false;
+    if (status === 'missing_ticket') {
+      if (!missingTicket(r)) return false;
+    } else if (status && r.status !== status) return false;
     return true;
   }
 
@@ -77,12 +111,19 @@
 
   function computeCoverage(from, to, statusFilter) {
     if (!from || !to || schedule.length === 0) return { pct: null, have: 0, total: 0 };
+    // missing_ticket is RO + collected + no ticket for filtering rows, but for the coverage
+    // record index it means the same thing a plain "collected" filter would.
+    const effectiveStatus = statusFilter === 'missing_ticket' ? 'collected' : statusFilter;
     // index records (ignoring the free-text query, respecting the status filter) by
     // address|container|date for a fast membership check
     const key = (address, container, date) => `${address}||${container}||${date}`;
     const recordDays = new Set();
+    // A day counts toward the denominator only if it has at least one record at all —
+    // any address, any status — so a day nothing was captured on isn't a missed stop.
+    const daysWithAnyRecord = new Set();
     for (const r of allRecords) {
-      if (statusFilter && r.status !== statusFilter) continue;
+      daysWithAnyRecord.add(dateOnly(r.capturedAt));
+      if (effectiveStatus && r.status !== effectiveStatus) continue;
       recordDays.add(key(r.address, r.container, dateOnly(r.capturedAt)));
     }
     let total = 0;
@@ -98,6 +139,7 @@
       const dateStr = day.toISOString().slice(0, 10);
       // A stop scheduled for today that has not happened yet is not a missed stop.
       if (dateStr >= todayStr) continue;
+      if (!daysWithAnyRecord.has(dateStr)) continue;
       for (const s of schedule) {
         if (s.weekday !== weekday) continue;
         total += 1;
@@ -147,7 +189,7 @@
         <img class="result-thumb" src="${esc(r.photoUrl)}" loading="lazy" alt="">
         <div class="result-main">
           <div class="result-address">${esc(r.address)}</div>
-          <div class="result-meta">${esc(r.container || '—')} · ${dateStr} ${timeStr} · <span class="badge ${r.status}" style="padding:2px 8px; font-size:10px;">${STATUS_LABEL[r.status] || r.status}</span></div>
+          <div class="result-meta">${esc(r.container || '—')} · ${dateStr} ${timeStr} · <span class="badge ${r.status}" style="padding:2px 8px; font-size:10px;">${STATUS_LABEL[r.status] || r.status}</span>${ticketSuffix(r)}</div>
           <div class="result-secs">${typeof r.captureMs === 'number' ? (r.captureMs / 1000).toFixed(1) + 's capture' : ''}</div>
         </div>`;
       results.appendChild(a);
@@ -168,6 +210,7 @@
   ])
     .then(([recData, schedData]) => {
       allRecords = recData.records || [];
+      if (isDemoTicket()) allRecords = decorateWithFixtureTickets(allRecords); // DEMO-FIXTURE
       schedule = schedData.stops || [];
       render();
     })
