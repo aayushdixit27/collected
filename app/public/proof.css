@@ -603,6 +603,9 @@ table.record-table td.num {
   border-bottom: 1px solid var(--rule);
 }
 .charge-line .sep { color: var(--ink-2); margin: 0 var(--g8); }
+.charge-line .term { white-space: nowrap; }
+
+#ddReceived { font-size: 14px; white-space: nowrap; }
 .charge-formula {
   font-family: var(--mono);
   font-size: 14px;
@@ -630,15 +633,15 @@ table.record-table td.num {
 
 @media print {
   * { color: #111 !important; background: #fff !important; }
-  body { background: #fff; font-size: 10pt; line-height: 1.25; }
+  body { background: #fff; font-size: 11pt; line-height: 1.25; }
   .proof-wrap { max-width: none; padding: 0; }
   .no-print, #map, .gmaps-link, .retrieved-badge, .proof-actions { display: none !important; }
   .proof-title-row { padding-bottom: 4px; margin-bottom: 6px; }
   .proof-title-row h1 { font-size: 16px; }
-  .photo-full { max-height: 20vh; width: auto; object-fit: contain; margin-bottom: 6px; }
+  .photo-full { max-height: 30vh; width: auto; object-fit: contain; margin-bottom: 6px; }
   .photo-ticket {
     float: right;
-    width: 30mm;
+    width: 45mm;
     max-height: none;
     margin: 0 0 4px 6px;
     border-width: 1px;
@@ -649,7 +652,7 @@ table.record-table td.num {
   table.record-table th, table.record-table td { padding: 2px 8px 2px 0; }
   table.record-table th { font-size: 9pt; }
   .captured-iso, .weighed-delta { font-size: 9pt; margin-top: 0; }
-  .charge-amount { font-size: 22px; padding: 2px 0 4px; }
+  .charge-amount { font-size: 26px; padding: 2px 0 4px; }
   .charge-line { padding: 2px 0; font-size: 10pt; }
   .charge-formula { padding: 2px 0; font-size: 9pt; }
   .footer-note { font-size: 9pt; margin: 4px 0 0; }
