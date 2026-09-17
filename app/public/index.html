@@ -9,11 +9,14 @@
 <body class="capture-body">
 <main class="phone" id="app">
 
-  <!-- Capture view -->
+  <!-- Capture view: one record, two photo slots -->
   <section id="captureView" class="cap">
     <header class="cap-top">
-      <span class="wordmark">Collected</span>
-      <span class="cap-day" id="dayLine">—</span>
+      <span class="cap-top-title">
+        <span class="wordmark">Collected</span>
+        <span class="cap-day" id="dayLine">—</span>
+      </span>
+      <button type="button" class="picker-close hidden" id="backBtn" aria-label="Back">×</button>
     </header>
 
     <div class="cap-route">
@@ -35,6 +38,15 @@
       <span class="chev" aria-hidden="true">›</span>
     </button>
 
+    <div class="stop-card static hidden" id="stopCardStatic">
+      <span class="stop-card-text">
+        <span class="k">This pull</span>
+        <span class="addr" id="stopAddrStatic"></span>
+        <span class="meta" id="stopMetaStatic"></span>
+      </span>
+    </div>
+
+    <div class="slot-k">Pickup</div>
     <div class="hero" id="heroWrap">
       <label class="hero-label" id="cameraBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
@@ -45,7 +57,7 @@
       <label class="hero-alt">or choose from library<input id="libraryInput" type="file" accept="image/*"></label>
     </div>
 
-    <div class="cap-status">
+    <div class="cap-status" id="statusBlock">
       <div class="k">Status</div>
       <div class="segctl" id="statusRow" role="radiogroup" aria-label="Status">
         <button type="button" data-status="collected" class="on" role="radio" aria-checked="true">Collected</button>
@@ -60,11 +72,49 @@
         <button type="button" data-reason="not_out">Not out</button>
       </div>
     </div>
+    <div class="cap-status hidden" id="statusStaticBlock">
+      <div class="k">Status</div>
+      <div class="status-static" id="statusStaticText">Collected</div>
+    </div>
 
-    <div class="cap-note">
+    <div class="slot-k">Scale ticket</div>
+    <div class="slot" id="ticketSlotWrap">
+      <label class="slot-label" id="ticketCameraBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <span class="txt">
+          <span class="t">Photograph the ticket</span>
+          <span class="s" id="ticketSlotSub">Optional now — add it later from the route</span>
+          <span class="alt" id="ticketLibraryBtn">or choose from library</span>
+        </span>
+        <input id="ticketCameraInput" type="file" accept="image/*" capture="environment">
+      </label>
+      <input id="ticketLibraryInput" class="sr-only-file" type="file" accept="image/*">
+    </div>
+
+    <div class="ticket-hint hidden" id="ticketHint">Add the net weight to attach the ticket</div>
+
+    <div class="weight hidden" id="weightBlock">
+      <label class="k" for="netLbInput">Net weight</label>
+      <div class="weight-wrap">
+        <input id="netLbInput" class="field" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="From the ticket, in pounds">
+        <span class="unit">lb</span>
+      </div>
+    </div>
+    <div class="cap-note more-toggle hidden" id="moreToggleWrap">
+      <button type="button" class="note-toggle" id="moreToggle">+ Gross / tare / facility</button>
+    </div>
+    <div class="more hidden" id="moreBlock">
+      <span class="fw"><input id="grossInput" class="field num" type="text" inputmode="numeric" placeholder="Gross (lb)"><span class="unit">gross</span></span>
+      <span class="fw"><input id="tareInput" class="field num" type="text" inputmode="numeric" placeholder="Tare (lb)"><span class="unit">tare</span></span>
+      <input id="facilityInput" class="field full" type="text" placeholder="Facility">
+    </div>
+
+    <div class="cap-note" id="noteRow">
       <button type="button" class="note-toggle" id="noteToggle">+ Add a note</button>
       <input id="noteInput" class="field hidden" type="text" maxlength="140" placeholder="Note (optional)">
     </div>
+
+    <div class="save-error hidden" id="saveError"></div>
 
     <div class="cap-bar">
       <button type="button" id="saveBtn" class="save" disabled>Save record</button>
@@ -75,6 +125,8 @@
   <section id="confirmView" class="confirm hidden">
     <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5 5L20 7"/></svg></div>
     <div class="elapsed" id="elapsedText">Recorded</div>
+    <div class="saved-slots" id="savedSlots"></div>
+    <div class="save-error hidden" id="savedTicketError"></div>
     <div class="saved-stop" id="savedStop"></div>
     <div class="url" id="proofUrlText"></div>
     <div class="gps-warning hidden" id="gpsWarning">Saved without a location fix.</div>
@@ -84,78 +136,9 @@
     </div>
     <div class="action-row">
       <button type="button" id="nextStopBtn" class="save">Next stop</button>
-      <button type="button" id="addTicketBtn" class="btn-secondary hidden">Add scale ticket</button>
+      <button type="button" id="addTicketBtn" class="btn-secondary hidden">Add ticket now</button>
     </div>
     <a class="footer-link" href="/office">Office view</a>
-  </section>
-
-  <!-- Ticket view -->
-  <section id="ticketView" class="cap hidden">
-    <div id="ticketFormWrap">
-      <header class="cap-top">
-        <span class="cap-top-title">
-          <span class="wordmark">Collected</span>
-          <span class="cap-day" id="ticketDayLine">—</span>
-        </span>
-        <button type="button" class="picker-close" id="ticketCloseBtn" aria-label="Back">×</button>
-      </header>
-
-      <div class="cap-route">
-        <div class="cap-route-row"><span id="ticketRoutePos"><b>Scale ticket</b></span><span id="ticketPickedUp"></span></div>
-      </div>
-
-      <div class="stop-card static">
-        <span class="stop-card-text">
-          <span class="k">This pull</span>
-          <span class="addr" id="ticketAddr"></span>
-          <span class="meta" id="ticketMeta"></span>
-        </span>
-      </div>
-
-      <div class="hero" id="ticketHeroWrap">
-        <label class="hero-label" id="ticketCameraBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
-          <span class="t">Photograph the ticket</span>
-          <span class="s">The paper ticket from the scale house</span>
-          <input id="ticketCameraInput" type="file" accept="image/*" capture="environment">
-        </label>
-        <label class="hero-alt">or choose from library<input id="ticketLibraryInput" type="file" accept="image/*"></label>
-      </div>
-
-      <div class="weight">
-        <label class="k" for="netLbInput">Net weight</label>
-        <div class="weight-wrap">
-          <input id="netLbInput" class="field" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="From the ticket, in pounds">
-          <span class="unit">lb</span>
-        </div>
-      </div>
-
-      <div class="cap-note more-toggle">
-        <button type="button" class="note-toggle" id="moreToggle">+ Gross / tare / facility</button>
-      </div>
-      <div class="more hidden" id="moreBlock">
-        <span class="fw"><input id="grossInput" class="field num" type="text" inputmode="numeric" placeholder="Gross (lb)"><span class="unit">gross</span></span>
-        <span class="fw"><input id="tareInput" class="field num" type="text" inputmode="numeric" placeholder="Tare (lb)"><span class="unit">tare</span></span>
-        <input id="facilityInput" class="field full" type="text" placeholder="Facility">
-      </div>
-
-      <div class="ticket-error hidden" id="ticketError"></div>
-
-      <div class="cap-bar">
-        <button type="button" id="ticketSaveBtn" class="save" disabled>Save ticket</button>
-      </div>
-    </div>
-
-    <div id="ticketSavedWrap" class="confirm hidden">
-      <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5 5L20 7"/></svg></div>
-      <div class="elapsed" id="ticketSavedHeadline">Ticket tied</div>
-      <div class="saved-stop" id="ticketSavedSub"></div>
-      <div class="url" id="ticketProofUrlText"></div>
-      <div class="btn-row">
-        <button type="button" id="ticketCopyLinkBtn" class="btn-secondary">Copy link</button>
-      </div>
-      <button type="button" id="ticketDoneBtn" class="save">Done</button>
-    </div>
   </section>
 
   <!-- Stop picker -->

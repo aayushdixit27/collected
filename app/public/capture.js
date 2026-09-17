@@ -2,6 +2,7 @@
   const state = {
     schedule: [],
     todayRecords: [], // records captured today, for the route progress line
+    mode: 'capture', // 'capture' | 'addLater'
     address: '',
     container: null,
     routeOrder: null,
@@ -14,46 +15,53 @@
     gpsFixed: false,
     t0: null,
     capturedAt: null,
+    ticketPhotoBlob: null,
+    ticketT0: null,
+  };
+
+  // ---- add-later mode: opening this same screen for a record awaiting a ticket ----
+  const laState = {
+    record: null, // {id, address, container, status, capturedAt, photoUrl, pricing}
+    photoBlob: null,
+    t0: null,
+    returnTo: null, // 'capture' | 'confirm' — which view to restore on Back
   };
 
   const el = (id) => document.getElementById(id);
   const captureView = el('captureView');
   const confirmView = el('confirmView');
+  const backBtn = el('backBtn');
   const heroWrap = el('heroWrap');
+  const statusBlock = el('statusBlock');
+  const statusStaticBlock = el('statusStaticBlock');
   const statusRow = el('statusRow');
   const reasonRow = el('reasonRow');
+  const noteRow = el('noteRow');
   const noteToggle = el('noteToggle');
   const noteInput = el('noteInput');
   const saveBtn = el('saveBtn');
+  const saveError = el('saveError');
   const stopDialog = el('stopDialog');
   const addressInput = el('addressInput');
   const stopList = el('stopList');
+  const stopCard = el('stopCard');
+  const stopCardStatic = el('stopCardStatic');
+  const awaitingRow = el('awaitingRow');
+  const awaitingDialog = el('awaitingDialog');
+  const awaitingList = el('awaitingList');
 
-  // ---- ticket screen ----
-  const ticketView = el('ticketView');
-  const ticketFormWrap = el('ticketFormWrap');
-  const ticketSavedWrap = el('ticketSavedWrap');
-  const ticketHeroWrap = el('ticketHeroWrap');
+  // ---- scale ticket slot (ticketSlotSub/ticketLibraryBtn live inside ticketSlotWrap's
+  // innerHTML, which is replaced on every reset, so they're always looked up fresh) ----
+  const ticketSlotWrap = el('ticketSlotWrap');
+  const ticketHint = el('ticketHint');
+  const weightBlock = el('weightBlock');
+  const moreToggleWrap = el('moreToggleWrap');
   const netLbInput = el('netLbInput');
   const grossInput = el('grossInput');
   const tareInput = el('tareInput');
   const facilityInput = el('facilityInput');
   const moreToggle = el('moreToggle');
   const moreBlock = el('moreBlock');
-  const ticketSaveBtn = el('ticketSaveBtn');
-  const ticketError = el('ticketError');
-  const awaitingRow = el('awaitingRow');
-  const awaitingDialog = el('awaitingDialog');
-  const awaitingList = el('awaitingList');
-  const ticketState = {
-    recordId: null,
-    address: '',
-    container: null,
-    pricing: null,
-    photoBlob: null,
-    t0: null,
-    openedFrom: null, // 'capture' | 'confirm' — which view to restore on Back/Done
-  };
 
   const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -61,6 +69,16 @@
   function markInteraction() {
     if (state.t0 === null) state.t0 = Date.now();
   }
+  function markTicketInteraction() {
+    if (state.ticketT0 === null) state.ticketT0 = Date.now();
+  }
+  // Add-later mode: ticketMs is first tap on that whole screen.
+  function markAddLaterInteraction() {
+    if (state.mode === 'addLater' && laState.t0 === null) laState.t0 = Date.now();
+  }
+  captureView.addEventListener('click', markAddLaterInteraction, true);
+  captureView.addEventListener('input', markAddLaterInteraction, true);
+  captureView.addEventListener('focus', markAddLaterInteraction, true);
 
   function haversineM(lat1, lon1, lat2, lon2) {
     const R = 6371000;
@@ -89,6 +107,7 @@
   function maybeAutoSelectNearest() {
     // Never re-select under a taken photo, and never over a stop the driver chose by hand.
     if (state.photoBlob || state.stopSource === 'manual' || !state.gps || state.schedule.length === 0) return;
+    if (state.mode !== 'capture') return;
     let best = null;
     let bestDist = Infinity;
     for (const s of state.schedule) {
@@ -119,13 +138,16 @@
     return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   }
 
-  // ---- awaiting a scale ticket ----
+  function findStopFor(address, container) {
+    return state.schedule.find((s) => s.address === address || (container && s.container === container));
+  }
+
+  // ---- awaiting a scale ticket: today's collected/removed pulls with no ticket yet ----
   function awaitingTickets() {
-    return state.todayRecords.filter(
-      (r) => r.status === 'collected' && r.container && r.container.startsWith('RO-') && !r.ticket
-    );
+    return state.todayRecords.filter((r) => (r.status === 'collected' || r.status === 'removed') && !r.ticket);
   }
   function renderAwaiting() {
+    if (state.mode !== 'capture') return;
     const list = awaitingTickets();
     if (list.length === 0) {
       awaitingRow.classList.add('hidden');
@@ -145,10 +167,10 @@
       const parts = r.address.split(',');
       const rest = parts.slice(1).join(',').trim();
       b.querySelector('.pi-addr').textContent = parts[0].trim();
-      b.querySelector('.pi-meta').textContent = `${rest}${rest ? ' · ' : ''}${r.container} · picked up ${formatTime(r.capturedAt)}`;
+      b.querySelector('.pi-meta').textContent = `${rest}${rest ? ' · ' : ''}${r.container || ''} · picked up ${formatTime(r.capturedAt)}`;
       b.addEventListener('click', () => {
         awaitingDialog.close();
-        openTicketView(r, 'capture');
+        openAddLater(r, 'capture');
       });
       awaitingList.appendChild(b);
     });
@@ -162,6 +184,7 @@
   function renderRoute() {
     const now = new Date();
     el('dayLine').textContent = `${DAY_SHORT[now.getDay()]} ${now.getDate()} ${MONTH_SHORT[now.getMonth()]}`;
+    if (state.mode !== 'capture') return;
     const today = todaysStops();
     const segs = el('routeSegs');
     segs.innerHTML = '';
@@ -274,7 +297,7 @@
       stopList.innerHTML = '<div class="picker-empty">No stops scheduled today. Search by address or container.</div>';
     }
   }
-  el('stopCard').addEventListener('click', () => {
+  stopCard.addEventListener('click', () => {
     markInteraction();
     addressInput.value = '';
     renderStopList();
@@ -291,46 +314,7 @@
     }
   });
 
-  // ---- camera / downscale ----
-  function wireCameraInput() {
-    const input = el('cameraInput');
-    if (!input) return;
-    input.addEventListener('click', markInteraction);
-    input.addEventListener('change', cameraChangeHandler);
-    const lib = el('libraryInput');
-    if (lib) {
-      lib.addEventListener('click', markInteraction);
-      lib.addEventListener('change', cameraChangeHandler);
-    }
-  }
-  const heroEmptyHtml = heroWrap.innerHTML;
-
-  function resetCamera() {
-    state.photoBlob = null;
-    heroWrap.innerHTML = heroEmptyHtml;
-    heroWrap.classList.remove('has-photo');
-    wireCameraInput();
-    updateSaveEnabled();
-  }
-
-  async function cameraChangeHandler(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    state.capturedAt = new Date().toISOString();
-    let blob;
-    try {
-      blob = await downscaleImage(file, 1400, 0.72);
-    } catch {
-      blob = file;
-    }
-    state.photoBlob = blob;
-    const url = URL.createObjectURL(blob);
-    heroWrap.classList.add('has-photo');
-    heroWrap.innerHTML = `<img class="hero-photo" src="${url}" alt="Captured photo"><button type="button" class="retake" id="retakeBtn">Retake</button>`;
-    el('retakeBtn').addEventListener('click', resetCamera);
-    updateSaveEnabled();
-  }
-
+  // ---- camera / downscale (shared by pickup hero, ticket slot, and drag-drop) ----
   function downscaleImage(file, maxEdge, quality) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -358,53 +342,167 @@
       reader.readAsDataURL(file);
     });
   }
-  wireCameraInput();
 
-  // ---- ticket photo / downscale (mirrors the pickup camera above) ----
-  function wireTicketCameraInput() {
-    const input = el('ticketCameraInput');
+  function isImageFile(file) {
+    return file && (file.type ? file.type.startsWith('image/') : true);
+  }
+
+  // ---- pickup hero ----
+  function wireCameraInput() {
+    const input = el('cameraInput');
     if (!input) return;
-    input.addEventListener('click', markTicketInteraction);
-    input.addEventListener('change', ticketCameraChangeHandler);
-    const lib = el('ticketLibraryInput');
+    input.addEventListener('click', markInteraction);
+    input.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) handlePickupFile(file);
+    });
+    const lib = el('libraryInput');
     if (lib) {
-      lib.addEventListener('click', markTicketInteraction);
-      lib.addEventListener('change', ticketCameraChangeHandler);
+      lib.addEventListener('click', markInteraction);
+      lib.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) handlePickupFile(file);
+      });
     }
   }
-  const ticketHeroEmptyHtml = ticketHeroWrap.innerHTML;
+  const heroEmptyHtml = heroWrap.innerHTML;
 
-  function resetTicketCamera() {
-    ticketState.photoBlob = null;
-    ticketHeroWrap.innerHTML = ticketHeroEmptyHtml;
-    ticketHeroWrap.classList.remove('has-photo');
-    wireTicketCameraInput();
-    updateTicketSaveEnabled();
+  function resetCamera() {
+    state.photoBlob = null;
+    heroWrap.innerHTML = heroEmptyHtml;
+    heroWrap.classList.remove('has-photo', 'locked');
+    wireCameraInput();
+    updateSaveEnabled();
   }
 
-  async function ticketCameraChangeHandler(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
+  async function handlePickupFile(file) {
+    markInteraction();
+    state.capturedAt = new Date().toISOString();
     let blob;
     try {
       blob = await downscaleImage(file, 1400, 0.72);
     } catch {
       blob = file;
     }
-    ticketState.photoBlob = blob;
+    state.photoBlob = blob;
     const url = URL.createObjectURL(blob);
-    ticketHeroWrap.classList.add('has-photo');
-    ticketHeroWrap.innerHTML = `<img class="hero-photo" src="${url}" alt="Ticket photo"><button type="button" class="retake" id="ticketRetakeBtn">Retake</button>`;
-    el('ticketRetakeBtn').addEventListener('click', resetTicketCamera);
-    updateTicketSaveEnabled();
+    heroWrap.classList.add('has-photo');
+    heroWrap.innerHTML = `<img class="hero-photo" src="${url}" alt="Captured photo"><button type="button" class="retake" id="retakeBtn">Retake</button>`;
+    el('retakeBtn').addEventListener('click', resetCamera);
+    updateSaveEnabled();
+  }
+  wireCameraInput();
+
+  ['dragover', 'dragleave', 'drop'].forEach((ev) => {
+    heroWrap.addEventListener(ev, (e) => {
+      // The pickup hero is locked and uneditable in add-later mode.
+      if (state.mode !== 'capture' || state.photoBlob) return;
+      if (ev === 'dragover') { e.preventDefault(); heroWrap.classList.add('dragover'); }
+      else if (ev === 'dragleave') { heroWrap.classList.remove('dragover'); }
+      else if (ev === 'drop') {
+        e.preventDefault();
+        heroWrap.classList.remove('dragover');
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file && isImageFile(file)) handlePickupFile(file);
+      }
+    });
+  });
+
+  // ---- scale ticket slot ----
+  function wireTicketCameraInput() {
+    const input = el('ticketCameraInput');
+    if (!input) return;
+    input.addEventListener('click', markTicketInteraction);
+    input.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) handleTicketFile(file);
+    });
+    const lib = el('ticketLibraryInput');
+    if (lib) {
+      lib.addEventListener('click', markTicketInteraction);
+      lib.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) handleTicketFile(file);
+      });
+    }
+    // The "or choose from library" text lives inside the camera <label>; keep it
+    // clicking its own hidden input rather than triggering the camera capture.
+    const altBtn = el('ticketLibraryBtn');
+    if (altBtn) {
+      altBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        markTicketInteraction();
+        const libInput = el('ticketLibraryInput');
+        if (libInput) libInput.click();
+      });
+    }
+  }
+  const ticketSlotEmptyHtml = ticketSlotWrap.innerHTML;
+
+  function currentTicketSub() {
+    return state.mode === 'addLater' ? 'The paper ticket from the scale house' : 'Optional now — add it later from the route';
   }
 
-  // ---- ticket screen wiring ----
-  function markTicketInteraction() {
-    if (ticketState.t0 === null) ticketState.t0 = Date.now();
+  // Retake: replaces just the photo, keeping any net/gross/tare/facility the
+  // driver already typed (mirrors the pickup hero's Retake, which never wipes
+  // the rest of the record either).
+  function resetTicketPhoto() {
+    if (state.mode === 'addLater') laState.photoBlob = null;
+    else state.ticketPhotoBlob = null;
+    ticketSlotWrap.innerHTML = ticketSlotEmptyHtml;
+    ticketSlotWrap.classList.remove('has-photo');
+    el('ticketSlotSub').textContent = currentTicketSub();
+    wireTicketCameraInput();
+    updateWeightVisibility();
+    updateSaveEnabled();
   }
-  ['input', 'click', 'focus'].forEach((ev) => {
-    ticketFormWrap.addEventListener(ev, markTicketInteraction, true);
+
+  // Full reset: used when leaving/entering add-later mode or moving to the next stop.
+  function resetTicketSlot() {
+    resetTicketPhoto();
+    resetWeightFields();
+    updateWeightVisibility();
+    updateSaveEnabled();
+  }
+
+  // The blob lives on state (capture mode) or laState (add-later mode).
+  function currentTicketBlob() {
+    return state.mode === 'addLater' ? laState.photoBlob : state.ticketPhotoBlob;
+  }
+
+  async function handleTicketFile(file) {
+    markTicketInteraction();
+    let blob;
+    try {
+      blob = await downscaleImage(file, 1400, 0.72);
+    } catch {
+      blob = file;
+    }
+    if (state.mode === 'addLater') laState.photoBlob = blob;
+    else state.ticketPhotoBlob = blob;
+    const url = URL.createObjectURL(blob);
+    ticketSlotWrap.classList.add('has-photo');
+    ticketSlotWrap.innerHTML = `<img class="slot-photo" src="${url}" alt="Ticket photo"><button type="button" class="retake" id="ticketRetakeBtn">Retake</button>`;
+    el('ticketRetakeBtn').addEventListener('click', resetTicketPhoto);
+    updateWeightVisibility();
+    updateSaveEnabled();
+  }
+  wireTicketCameraInput();
+
+  ['dragover', 'dragleave', 'drop'].forEach((ev) => {
+    ticketSlotWrap.addEventListener(ev, (e) => {
+      if (currentTicketBlob()) return;
+      if (ev === 'dragover') { e.preventDefault(); ticketSlotWrap.classList.add('dragover'); }
+      else if (ev === 'dragleave') { ticketSlotWrap.classList.remove('dragover'); }
+      else if (ev === 'drop') {
+        e.preventDefault();
+        ticketSlotWrap.classList.remove('dragover');
+        markTicketInteraction();
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file && isImageFile(file)) handleTicketFile(file);
+      }
+    });
   });
 
   function validNet(v) {
@@ -412,13 +510,6 @@
     const n = parseInt(v, 10);
     return n >= 1 && n <= 80000;
   }
-  function updateTicketSaveEnabled() {
-    ticketSaveBtn.disabled = !(ticketState.photoBlob && validNet(netLbInput.value.trim()));
-  }
-  netLbInput.addEventListener('input', updateTicketSaveEnabled);
-
-  // Gross/tare are optional integers: strip anything non-numeric as it's typed, and only
-  // ever send a value that parses to an in-range integer — never NaN, never free text.
   function digitsOnlyInput(input) {
     input.addEventListener('input', () => {
       const cleaned = input.value.replace(/[^0-9]/g, '');
@@ -434,168 +525,39 @@
     return n >= 1 && n <= 80000 ? n : null;
   }
 
-  moreToggle.addEventListener('click', () => {
-    const opening = moreBlock.classList.contains('hidden');
-    moreBlock.classList.toggle('hidden');
-    moreToggle.textContent = opening ? '− Gross / tare / facility' : '+ Gross / tare / facility';
+  netLbInput.addEventListener('focus', markTicketInteraction);
+  netLbInput.addEventListener('input', () => {
+    markTicketInteraction();
+    updateTicketHint();
+    updateSaveEnabled();
   });
 
-  function renderTicketHeader(record) {
-    const now = new Date();
-    el('ticketDayLine').textContent = `${DAY_SHORT[now.getDay()]} ${now.getDate()} ${MONTH_SHORT[now.getMonth()]}`;
-    const today = todaysStops();
-    const stop = today.find((s) => s.address === record.address || (record.container && s.container === record.container));
-    const routePos = el('ticketRoutePos');
-    routePos.textContent = '';
-    const b = document.createElement('b');
-    b.textContent = 'Scale ticket';
-    routePos.appendChild(b);
-    if (stop) routePos.append(` · stop ${stop.routeOrder} of ${today.length}`);
-    el('ticketPickedUp').textContent = record.capturedAt ? `picked up ${formatTime(record.capturedAt)}` : '';
-    const parts = (record.address || '').split(',');
-    el('ticketAddr').textContent = parts[0].trim();
-    const rest = parts.slice(1).join(',').trim();
-    const meta = el('ticketMeta');
-    meta.innerHTML = '';
-    if (rest) meta.append(rest);
-    if (record.container) {
-      if (rest) meta.append(' · ');
-      const code = document.createElement('code');
-      code.textContent = record.container;
-      meta.appendChild(code);
-    }
-  }
-
-  function resetTicketForm() {
+  function resetWeightFields() {
     netLbInput.value = '';
     grossInput.value = '';
     tareInput.value = '';
     facilityInput.value = '';
     moreBlock.classList.add('hidden');
     moreToggle.textContent = '+ Gross / tare / facility';
-    ticketError.classList.add('hidden');
-    ticketError.textContent = '';
-    ticketSaveBtn.disabled = true;
-    ticketSaveBtn.textContent = 'Save ticket';
-    ticketState.t0 = null;
-    resetTicketCamera();
   }
 
-  function openTicketView(record, openedFrom) {
-    ticketState.recordId = record.id;
-    ticketState.address = record.address;
-    ticketState.container = record.container || null;
-    ticketState.pricing = record.pricing || null;
-    ticketState.openedFrom = openedFrom === 'confirm' ? 'confirm' : 'capture';
-    resetTicketForm();
-    renderTicketHeader(record);
-    captureView.classList.add('hidden');
-    confirmView.classList.add('hidden');
-    ticketSavedWrap.classList.add('hidden');
-    ticketFormWrap.classList.remove('hidden');
-    ticketView.classList.remove('hidden');
+  function updateWeightVisibility() {
+    const hasPhoto = !!currentTicketBlob();
+    weightBlock.classList.toggle('hidden', !hasPhoto);
+    moreToggleWrap.classList.toggle('hidden', !hasPhoto);
+    if (!hasPhoto) moreBlock.classList.add('hidden');
+    updateTicketHint();
+  }
+  function updateTicketHint() {
+    const hasPhoto = !!currentTicketBlob();
+    const netOk = validNet(netLbInput.value.trim());
+    ticketHint.classList.toggle('hidden', !(hasPhoto && !netOk));
   }
 
-  // Back leaves whichever view opened the ticket screen exactly as it was —
-  // never resetForNext, so an in-progress pickup underneath survives a
-  // mistaken open, and a 404/409 on Save doesn't strand the driver here.
-  function closeTicketView() {
-    ticketView.classList.add('hidden');
-    if (ticketState.openedFrom === 'confirm') {
-      confirmView.classList.remove('hidden');
-    } else {
-      captureView.classList.remove('hidden');
-    }
-  }
-  el('ticketCloseBtn').addEventListener('click', closeTicketView);
-
-  function showTicketError(status) {
-    let msg;
-    if (status === 409) msg = 'This pull already has a ticket.';
-    else if (status === 400) msg = 'Check the photo and the net weight.';
-    else if (status === 404) msg = 'That record no longer exists.';
-    else msg = 'Could not save. Check your connection and try again.';
-    ticketError.textContent = msg;
-    ticketError.classList.remove('hidden');
-  }
-
-  function showTicketSaved(url, netLb, pricing) {
-    ticketFormWrap.classList.add('hidden');
-    ticketSavedWrap.classList.remove('hidden');
-    const includedLb = pricing && typeof pricing.includedLb === 'number' ? pricing.includedLb : 2000;
-    const overLb = Math.max(0, netLb - includedLb);
-    let headline = `Ticket tied · ${netLb.toLocaleString()} lb`;
-    if (overLb > 0) headline += ` · ${overLb.toLocaleString()} lb over`;
-    el('ticketSavedHeadline').textContent = headline;
-    el('ticketSavedSub').textContent =
-      ticketState.address.split(',')[0].trim() + (ticketState.container ? ` · ${ticketState.container}` : '');
-    el('ticketProofUrlText').textContent = location.origin + url;
-    el('ticketCopyLinkBtn').onclick = () => {
-      navigator.clipboard?.writeText(location.origin + url);
-      el('ticketCopyLinkBtn').textContent = 'Copied';
-      setTimeout(() => (el('ticketCopyLinkBtn').textContent = 'Copy link'), 1500);
-    };
-    el('ticketDoneBtn').onclick = () => {
-      ticketView.classList.add('hidden');
-      if (ticketState.openedFrom === 'confirm') {
-        // Opened from the saved screen: that pickup is done, move on to the next stop.
-        resetForNext();
-      } else {
-        // Opened mid-capture from the awaiting row: leave the in-progress pickup intact.
-        captureView.classList.remove('hidden');
-      }
-    };
-  }
-
-  ticketSaveBtn.addEventListener('click', async () => {
-    if (ticketSaveBtn.disabled) return;
-    markTicketInteraction();
-    ticketSaveBtn.disabled = true;
-    ticketSaveBtn.textContent = 'Saving…';
-    ticketError.classList.add('hidden');
-    const ticketMs = Date.now() - (ticketState.t0 || Date.now());
-    const netLb = parseInt(netLbInput.value.trim(), 10);
-    try {
-      const photoBase64 = await blobToBase64(ticketState.photoBlob);
-      const payload = {
-        photo: photoBase64,
-        netLb,
-        grossLb: optionalWeight(grossInput.value),
-        tareLb: optionalWeight(tareInput.value),
-        facility: facilityInput.value.trim() || null,
-        weighedAt: new Date().toISOString(),
-        gps: state.gpsFixed ? state.gps : null,
-        ticketMs,
-      };
-      const res = await fetch(`/api/records/${ticketState.recordId}/ticket`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const status = res.status;
-      const data = await res.json().catch(() => ({}));
-      if (status < 200 || status >= 300) {
-        showTicketError(status);
-        if (status === 409) {
-          // Some other path already ticketed this pull; stop counting it as awaiting
-          // instead of leaving the row stale until the next full reload.
-          const rec409 = state.todayRecords.find((r) => r.id === ticketState.recordId);
-          if (rec409) rec409.ticket = true; // the server has one; a reload would fetch it. Truthy is enough to drop it from the awaiting count.
-          renderAwaiting();
-        }
-        ticketSaveBtn.disabled = false;
-        ticketSaveBtn.textContent = 'Save ticket';
-        return;
-      }
-      const rec = state.todayRecords.find((r) => r.id === ticketState.recordId);
-      if (rec) rec.ticket = { netLb };
-      renderAwaiting();
-      showTicketSaved(data.url, netLb, ticketState.pricing);
-    } catch (err) {
-      showTicketError(0);
-      ticketSaveBtn.disabled = false;
-      ticketSaveBtn.textContent = 'Save ticket';
-    }
+  moreToggle.addEventListener('click', () => {
+    const opening = moreBlock.classList.contains('hidden');
+    moreBlock.classList.toggle('hidden');
+    moreToggle.textContent = opening ? '− Gross / tare / facility' : '+ Gross / tare / facility';
   });
 
   // ---- status / reasons ----
@@ -626,9 +588,13 @@
   });
   noteInput.addEventListener('input', () => { state.note = noteInput.value; });
 
-  // ---- save ----
+  // ---- save enablement ----
   function updateSaveEnabled() {
-    saveBtn.disabled = !(state.photoBlob && state.address && state.address.trim());
+    if (state.mode === 'addLater') {
+      saveBtn.disabled = !(laState.photoBlob && validNet(netLbInput.value.trim()));
+    } else {
+      saveBtn.disabled = !(state.photoBlob && state.address && state.address.trim());
+    }
   }
 
   function blobToBase64(blob) {
@@ -650,54 +616,224 @@
     });
   }
 
-  saveBtn.addEventListener('click', async () => {
+  function hideError() {
+    saveError.classList.add('hidden');
+    saveError.textContent = '';
+  }
+  function showError(text) {
+    saveError.textContent = text;
+    saveError.classList.remove('hidden');
+  }
+  async function errorTextFromResponse(res) {
+    const data = await res.json().catch(() => null);
+    if (data && typeof data.error === 'string' && data.error) return data.error;
+    return `Server error ${res.status}`;
+  }
+
+  // ---- error line above Save: never alert(), always textContent ----
+
+  saveBtn.addEventListener('click', () => {
     if (saveBtn.disabled) return;
+    if (state.mode === 'addLater') onSaveTicketOnly();
+    else onSaveOneGo();
+  });
+
+  async function onSaveTicketOnly() {
+    markAddLaterInteraction();
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    hideError();
+    const ticketMs = Date.now() - (laState.t0 || Date.now());
+    const netLb = parseInt(netLbInput.value.trim(), 10);
+    let res;
+    try {
+      const photoBase64 = await blobToBase64(laState.photoBlob);
+      const payload = {
+        photo: photoBase64,
+        netLb,
+        grossLb: optionalWeight(grossInput.value),
+        tareLb: optionalWeight(tareInput.value),
+        facility: facilityInput.value.trim() || null,
+        weighedAt: new Date().toISOString(),
+        gps: state.gpsFixed ? state.gps : null,
+        ticketMs,
+      };
+      res = await fetch(`/api/records/${laState.record.id}/ticket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      showError('Could not save. Check your connection and try again.');
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save ticket';
+      return;
+    }
+    if (!res.ok) {
+      showError(await errorTextFromResponse(res));
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save ticket';
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    const rec = state.todayRecords.find((r) => r.id === laState.record.id);
+    if (rec) rec.ticket = { netLb };
+    showTicketTiedConfirm(laState.record, netLb, data.url);
+  }
+
+  async function onSaveOneGo() {
     markInteraction();
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
+    hideError();
     await waitForGps(2500);
     const captureMs = Date.now() - (state.t0 || Date.now());
+    const hasTicketPhoto = !!state.ticketPhotoBlob;
+    const netValid = hasTicketPhoto && validNet(netLbInput.value.trim());
+    const ticketMs = hasTicketPhoto ? Date.now() - (state.ticketT0 || Date.now()) : null;
+
+    const stop = findStopFor(state.address, state.container);
+    const pricing = stop && typeof stop.includedLb === 'number' && typeof stop.ratePerTon === 'number'
+      ? { includedLb: stop.includedLb, ratePerTon: stop.ratePerTon }
+      : undefined;
+
+    const capturedAtIso = state.capturedAt || new Date().toISOString();
+    const payload = {
+      address: state.address,
+      container: state.container,
+      status: state.status,
+      reason: state.status === 'not_collected' ? state.reason : null,
+      note: state.note,
+      capturedAt: capturedAtIso,
+      gps: state.gpsFixed ? state.gps : null,
+      captureMs,
+      photo: null,
+      pricing,
+    };
+
+    let recordId, recordUrl;
     try {
-      const photoBase64 = await blobToBase64(state.photoBlob);
-      const payload = {
-        address: state.address,
-        container: state.container,
-        status: state.status,
-        reason: state.status === 'not_collected' ? state.reason : null,
-        note: state.note,
-        capturedAt: state.capturedAt || new Date().toISOString(),
-        gps: state.gpsFixed ? state.gps : null,
-        captureMs,
-        photo: photoBase64,
-      };
+      payload.photo = await blobToBase64(state.photoBlob);
       const res = await fetch('/api/records', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('save failed');
+      if (!res.ok) {
+        showError(await errorTextFromResponse(res));
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save record';
+        return;
+      }
       const data = await res.json();
-      state.todayRecords.push({
-        id: data.id,
-        address: payload.address,
-        capturedAt: payload.capturedAt,
-        container: payload.container,
-        status: payload.status,
-        ticket: null,
-        pricing: null,
-      });
-      showConfirm(data.id, data.url, captureMs);
+      recordId = data.id;
+      recordUrl = data.url;
     } catch (err) {
+      showError('Could not save. Check your connection and try again.');
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save record';
-      alert('Could not save. Check your connection and try again.');
+      return;
     }
-  });
 
-  function showConfirm(id, url, ms) {
+    // The record exists from here on; a ticket failure never re-shows the capture screen.
+    const effectivePricing = pricing || { includedLb: 2000, ratePerTon: 95 };
+    const newRec = {
+      id: recordId,
+      address: payload.address,
+      capturedAt: payload.capturedAt,
+      container: payload.container,
+      status: payload.status,
+      photoUrl: null,
+      ticket: null,
+      pricing: effectivePricing,
+    };
+    state.todayRecords.push(newRec);
+
+    let ticketOutcome = 'none'; // 'none' | 'later' | 'ok' | 'failed'
+    let ticketErrText = null;
+    let netLb = null;
+
+    if (hasTicketPhoto && netValid) {
+      netLb = parseInt(netLbInput.value.trim(), 10);
+      try {
+        const ticketPhotoBase64 = await blobToBase64(state.ticketPhotoBlob);
+        const tpayload = {
+          photo: ticketPhotoBase64,
+          netLb,
+          grossLb: optionalWeight(grossInput.value),
+          tareLb: optionalWeight(tareInput.value),
+          facility: facilityInput.value.trim() || null,
+          weighedAt: new Date().toISOString(),
+          gps: state.gpsFixed ? state.gps : null,
+          ticketMs,
+        };
+        const tres = await fetch(`/api/records/${recordId}/ticket`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(tpayload),
+        });
+        if (tres.ok) {
+          ticketOutcome = 'ok';
+          newRec.ticket = { netLb };
+        } else {
+          ticketOutcome = 'failed';
+          ticketErrText = await errorTextFromResponse(tres);
+        }
+      } catch (err) {
+        ticketOutcome = 'failed';
+        ticketErrText = 'Could not save. Check your connection and try again.';
+      }
+    } else if (hasTicketPhoto) {
+      ticketOutcome = 'later';
+    }
+
+    renderAwaiting();
+    showConfirmOneGo({ id: recordId, url: recordUrl, captureMs, netLb, ticketOutcome, ticketErrText, record: newRec });
+  }
+
+  function overageLine(netLb, pricing) {
+    const includedLb = pricing && typeof pricing.includedLb === 'number' ? pricing.includedLb : 2000;
+    const overLb = Math.max(0, netLb - includedLb);
+    const span = document.createElement('span');
+    span.className = 'dim';
+    span.textContent = ` · ${overLb.toLocaleString()} lb over`;
+    return { overLb, span };
+  }
+
+  function showConfirmOneGo({ id, url, captureMs, netLb, ticketOutcome, ticketErrText, record }) {
     captureView.classList.add('hidden');
     confirmView.classList.remove('hidden');
-    el('elapsedText').textContent = `Recorded in ${(ms / 1000).toFixed(1)}s`;
+    el('elapsedText').textContent = `Recorded in ${(captureMs / 1000).toFixed(1)}s`;
+
+    const savedSlots = el('savedSlots');
+    savedSlots.innerHTML = '';
+    const pickupPart = document.createElement('span');
+    pickupPart.textContent = 'Pickup ✓';
+    savedSlots.appendChild(pickupPart);
+
+    const savedTicketError = el('savedTicketError');
+    savedTicketError.classList.add('hidden');
+    savedTicketError.textContent = '';
+
+    if (ticketOutcome === 'ok') {
+      savedSlots.append(' · ');
+      const t = document.createElement('span');
+      t.textContent = `Ticket ✓ ${netLb.toLocaleString()} lb`;
+      savedSlots.appendChild(t);
+      const { overLb, span } = overageLine(netLb, record.pricing);
+      if (overLb > 0) savedSlots.appendChild(span);
+    } else {
+      savedSlots.append(' · ');
+      const t = document.createElement('span');
+      t.className = 'dim';
+      t.textContent = 'Ticket — add later';
+      savedSlots.appendChild(t);
+      if (ticketOutcome === 'failed') {
+        savedTicketError.textContent = `Saved. Ticket not attached: ${ticketErrText}`;
+        savedTicketError.classList.remove('hidden');
+      }
+    }
+
     el('savedStop').textContent = state.address.split(',')[0] + (state.container ? ` · ${state.container}` : '');
     el('proofUrlText').textContent = location.origin + url;
     el('gpsWarning').classList.toggle('hidden', !!state.gps);
@@ -710,24 +846,168 @@
     if (navigator.share) {
       shareBtn.classList.remove('hidden');
       shareBtn.onclick = () => navigator.share({ title: 'Collected — service record', url: location.origin + url }).catch(() => {});
+    } else {
+      shareBtn.classList.add('hidden');
     }
     el('nextStopBtn').onclick = resetForNext;
+
     const addTicketBtn = el('addTicketBtn');
-    const eligible = state.status === 'collected' && !!state.container && state.container.startsWith('RO-');
+    const ticketMissing = ticketOutcome !== 'ok';
+    const eligible = ticketMissing && (record.status === 'collected' || record.status === 'removed');
     addTicketBtn.classList.toggle('hidden', !eligible);
     if (eligible) {
-      const savedRecord = {
-        id,
-        address: state.address,
-        container: state.container,
-        status: state.status,
-        capturedAt: state.capturedAt || new Date().toISOString(),
-        ticket: null,
-        pricing: null,
-      };
-      addTicketBtn.onclick = () => openTicketView(savedRecord, 'confirm');
+      addTicketBtn.onclick = () => openAddLater(record, 'confirm');
     }
   }
+
+  function showTicketTiedConfirm(record, netLb, url) {
+    captureView.classList.add('hidden');
+    confirmView.classList.remove('hidden');
+    el('elapsedText').textContent = 'Ticket tied';
+
+    const savedSlots = el('savedSlots');
+    savedSlots.innerHTML = '';
+    const t = document.createElement('span');
+    t.textContent = `Ticket ✓ ${netLb.toLocaleString()} lb`;
+    savedSlots.appendChild(t);
+    const { overLb, span } = overageLine(netLb, record.pricing);
+    if (overLb > 0) savedSlots.appendChild(span);
+
+    el('savedTicketError').classList.add('hidden');
+    el('savedTicketError').textContent = '';
+
+    el('savedStop').textContent = record.address.split(',')[0] + (record.container ? ` · ${record.container}` : '');
+    el('proofUrlText').textContent = location.origin + url;
+    el('gpsWarning').classList.add('hidden');
+    el('copyLinkBtn').onclick = () => {
+      navigator.clipboard?.writeText(location.origin + url);
+      el('copyLinkBtn').textContent = 'Copied';
+      setTimeout(() => (el('copyLinkBtn').textContent = 'Copy link'), 1500);
+    };
+    const shareBtn = el('shareBtn');
+    if (navigator.share) {
+      shareBtn.classList.remove('hidden');
+      shareBtn.onclick = () => navigator.share({ title: 'Collected — service record', url: location.origin + url }).catch(() => {});
+    } else {
+      shareBtn.classList.add('hidden');
+    }
+    el('addTicketBtn').classList.add('hidden');
+    // After an add-later save, Next stop must also drop the add-later UI
+    // (static stop card, locked hero, back button) before it resets for real.
+    el('nextStopBtn').onclick = () => { exitAddLaterUI(); resetForNext(); };
+  }
+
+  // ---- add-later mode: this same screen, opened for a record awaiting a ticket ----
+  function renderAddLaterHeader(record) {
+    const parts = (record.address || '').split(',');
+    el('stopAddrStatic').textContent = parts[0].trim();
+    const rest = parts.slice(1).join(',').trim();
+    const meta = el('stopMetaStatic');
+    meta.innerHTML = '';
+    if (rest) meta.append(rest);
+    if (record.container) {
+      if (rest) meta.append(' · ');
+      const code = document.createElement('code');
+      code.textContent = record.container;
+      meta.appendChild(code);
+    }
+    meta.append(` · picked up ${formatTime(record.capturedAt)}`);
+  }
+
+  function renderLockedHero(record) {
+    heroWrap.classList.add('has-photo', 'locked');
+    heroWrap.innerHTML = '';
+    const img = document.createElement('img');
+    img.className = 'hero-photo';
+    img.alt = '';
+    img.src = record.photoUrl || '';
+    const tag = document.createElement('span');
+    tag.className = 'hero-tag';
+    tag.textContent = `Pickup · ${formatTime(record.capturedAt)}`;
+    heroWrap.appendChild(img);
+    heroWrap.appendChild(tag);
+  }
+
+  const STATUS_LABEL = { collected: 'Collected', delivered: 'Delivered', removed: 'Removed', not_collected: "Couldn't" };
+
+  function openAddLater(record, returnTo) {
+    state.mode = 'addLater';
+    laState.record = record;
+    laState.photoBlob = null;
+    laState.t0 = null;
+    laState.returnTo = returnTo === 'confirm' ? 'confirm' : 'capture';
+
+    backBtn.classList.remove('hidden');
+    awaitingRow.classList.add('hidden');
+    stopCard.classList.add('hidden');
+    stopCardStatic.classList.remove('hidden');
+    renderAddLaterHeader(record);
+
+    renderLockedHero(record);
+
+    statusBlock.classList.add('hidden');
+    statusStaticBlock.classList.remove('hidden');
+    el('statusStaticText').textContent = STATUS_LABEL[record.status] || record.status;
+
+    noteRow.classList.add('hidden');
+
+    resetTicketSlot();
+
+    saveBtn.textContent = 'Save ticket';
+    saveBtn.disabled = true;
+    hideError();
+
+    captureView.classList.remove('hidden');
+    confirmView.classList.add('hidden');
+
+    // Ticket slot gets focus on open.
+    requestAnimationFrame(() => {
+      ticketSlotWrap.scrollIntoView({ block: 'center' });
+      const camBtn = el('ticketCameraBtn');
+      if (camBtn) camBtn.focus({ preventScroll: true });
+    });
+  }
+
+  // Flips the DOM/mode back to plain capture; shared by "Back" (cancel, restores
+  // whatever view was underneath) and a post-save "Next stop" (which then runs a
+  // full resetForNext on top of it).
+  function exitAddLaterUI() {
+    state.mode = 'capture';
+    laState.record = null;
+    laState.photoBlob = null;
+    laState.t0 = null;
+
+    backBtn.classList.add('hidden');
+    stopCard.classList.remove('hidden');
+    stopCardStatic.classList.add('hidden');
+    statusStaticBlock.classList.add('hidden');
+    statusBlock.classList.remove('hidden');
+    noteRow.classList.remove('hidden');
+  }
+
+  // Back leaves whichever view opened the add-later screen exactly as it was —
+  // never resetForNext, so an in-progress pickup underneath survives a
+  // mistaken open, and a failed Save doesn't strand the driver here.
+  function closeAddLater() {
+    const returnTo = laState.returnTo;
+    exitAddLaterUI();
+
+    resetCamera();
+    resetTicketSlot();
+    saveBtn.textContent = 'Save record';
+    hideError();
+    renderStopCard();
+    renderRoute();
+    updateSaveEnabled();
+
+    captureView.classList.remove('hidden');
+    if (returnTo === 'confirm') {
+      confirmView.classList.remove('hidden');
+    } else {
+      confirmView.classList.add('hidden');
+    }
+  }
+  backBtn.addEventListener('click', closeAddLater);
 
   function resetForNext() {
     state.address = '';
@@ -739,6 +1019,8 @@
     state.reason = null;
     state.note = '';
     state.t0 = null;
+    state.ticketT0 = null;
+    state.ticketPhotoBlob = null;
     state.capturedAt = null;
     noteInput.value = '';
     noteInput.classList.add('hidden');
@@ -749,6 +1031,8 @@
     reasonRow.classList.add('hidden');
     [...reasonRow.children].forEach((c) => c.classList.remove('on'));
     resetCamera();
+    resetTicketSlot();
+    hideError();
     saveBtn.disabled = true;
     saveBtn.textContent = 'Save record';
     confirmView.classList.add('hidden');
@@ -775,6 +1059,7 @@
           capturedAt: r.capturedAt,
           container: r.container,
           status: r.status,
+          photoUrl: r.photoUrl || null,
           ticket: r.ticket || null,
           pricing: r.pricing || null,
         }));

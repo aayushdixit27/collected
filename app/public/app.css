@@ -466,7 +466,7 @@ input::placeholder { color: var(--placeholder); opacity: 1; }
 .capture-body { background: var(--bg); margin: 0; }
 .phone { max-width: 480px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 .cap { display: flex; flex-direction: column; flex: 1; min-height: 100vh; min-height: 100dvh; }
-.cap-top { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 16px 6px; }
+.cap-top { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px; gap: 8px; }
 .wordmark { font-weight: 700; font-size: 17px; letter-spacing: .01em; color: var(--text); }
 .cap-day { color: var(--text-dim); font-size: 14px; }
 .cap-route { padding: 0 16px 14px; }
@@ -496,7 +496,8 @@ input::placeholder { color: var(--placeholder); opacity: 1; }
   border: 2px dashed #3a4147; border-radius: 16px; background: #0f1214; overflow: hidden;
   display: flex; align-items: stretch;
 }
-.hero.has-photo { border-style: solid; border-color: var(--border); }
+.hero.has-photo { border-style: solid; border-color: var(--border); flex: 0 0 auto; height: 200px; }
+.hero.dragover, .slot.dragover { border-color: var(--text-dim); }
 .hero-label { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer; color: var(--text); }
 .hero-label svg { width: 44px; height: 44px; color: var(--accent); }
 .hero-label .t { font-size: 19px; font-weight: 600; }
@@ -574,13 +575,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .has-ticket { color: var(--text-dim); white-space: nowrap; }
 
 /* ============================================================
-   Ticket screen, from the approved mockup (17 Sep). Same tokens,
+   One record, two photo slots (round 3, 17 Sep). Same tokens,
    same components as the capture screen — proposed additions moved
-   verbatim from the mockup's inline <style>.
+   verbatim from the approved mockup's inline <style>.
    ============================================================ */
 .stop-card.static { cursor: default; }
 .stop-card .meta .when { color: var(--text); }
-.weight { margin: 14px 16px 0; }
+.weight { margin: 12px 16px 0; }
 .weight .k { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); font-weight: 600; margin-bottom: 8px; display: block; }
 .weight-wrap { position: relative; }
 .weight .field {
@@ -596,10 +597,30 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .more .fw .unit { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 14px; font-weight: 600; }
 .more .field.num { padding-right: 64px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
 
-/* Ticket view is a third .cap section; its form content stays a direct flex
-   child of that column so .cap-bar's margin-top: auto still pins Save down. */
-#ticketFormWrap { display: contents; }
-.ticket-error { margin: 10px 16px 0; color: var(--red); font-size: 14px; }
+/* Scale ticket slot: the hero pattern at ~120px, camera icon dim (not cyan —
+   cyan stays on the pickup hero icon and Save only). */
+.slot { margin: 12px 16px 0; position: relative; min-height: 120px; border: 2px dashed #3a4147; border-radius: 16px; background: #0f1214; overflow: hidden; display: flex; }
+.slot.has-photo { border-style: solid; border-color: var(--border); }
+.slot-label { flex: 1; display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; color: var(--text); }
+.slot-label svg { width: 32px; height: 32px; color: var(--text-dim); flex-shrink: 0; }
+.slot-label .txt { display: flex; flex-direction: column; gap: 3px; }
+.slot-label .t { font-size: 17px; font-weight: 600; }
+.slot-label .s { font-size: 14px; color: var(--text-dim); }
+.slot-label .alt { font-size: 14px; color: var(--text-dim); text-decoration: underline; margin-top: 2px; }
+.slot-label input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.sr-only-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.slot-photo { width: 100%; height: 120px; object-fit: cover; display: block; }
+.slot .retake { position: absolute; right: 10px; bottom: 10px; font: inherit; font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 9px; border: 1px solid var(--border); background: rgba(11,13,15,.85); color: var(--text); cursor: pointer; }
+.slot-k { margin: 14px 16px 0; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); font-weight: 600; }
+.slot-k + .slot, .slot-k + .hero { margin-top: 8px; }
+.hero.locked .hero-tag, .slot.locked .hero-tag { position: absolute; left: 10px; bottom: 10px; font-size: 13px; font-weight: 600; padding: 6px 10px; border-radius: 9px; background: rgba(11,13,15,.85); color: var(--text); border: 1px solid var(--border); }
+.status-static { font-size: 17px; font-weight: 600; padding: 12px 0 0; }
+.save-error { margin: 10px 16px 0; color: var(--red); font-size: 15px; }
+.saved-slots { font-size: 17px; font-weight: 600; margin-top: 2px; }
+.saved-slots .dim { color: var(--text-dim); font-weight: 500; }
+/* "Add the net weight to attach the ticket" — dim, not red; appears the moment
+   a ticket photo is in and the field is empty. */
+.ticket-hint { margin: 10px 16px 0; color: var(--text-dim); font-size: 14px; }
 
 /* Quiet row under the route header: plain text, no card, never competes with
    the stop card below it. */
@@ -611,7 +632,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 .awaiting-row .chev { color: var(--text-dim); font-size: 20px; line-height: 1; }
 
-/* Saved screen: Next stop and Add scale ticket share a row. */
+/* Saved screen: Next stop and Add ticket now share a row. */
 .confirm .action-row { display: flex; gap: 8px; width: 100%; margin-top: 12px; }
 .confirm .action-row .save, .confirm .action-row .btn-secondary { flex: 1; margin-top: 0; }
 
@@ -620,4 +641,3 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 /* Ticket screen header: title group plus a Back close button, picker-close pattern. */
 .cap-top-title { display: flex; align-items: baseline; justify-content: space-between; flex: 1; min-width: 0; gap: 8px; }
-#ticketView .cap-top { align-items: center; gap: 8px; }
