@@ -489,7 +489,7 @@ table.record-table th {
   font-weight: 600;
   font-size: 14px;
 }
-table.record-table td { color: var(--ink); }
+table.record-table td { color: var(--ink); overflow-wrap: anywhere; }
 table.record-table td.mono { font-family: var(--mono); }
 .captured-iso {
   display: block;

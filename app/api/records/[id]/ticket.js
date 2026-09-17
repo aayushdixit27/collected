@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     netLb,
     grossLb: typeof grossLb === 'number' ? grossLb : null,
     tareLb: typeof tareLb === 'number' ? tareLb : null,
-    facility: facility && String(facility).trim() ? String(facility).trim() : null,
+    facility: facility && String(facility).trim() ? String(facility).trim().slice(0, 80) : null,
     weighedAt: weighedAtIso,
     gps:
       gps && typeof gps.lat === 'number' && typeof gps.lon === 'number'
