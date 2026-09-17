@@ -375,6 +375,16 @@
     updateSaveEnabled();
   }
 
+  // Renders a pickup photo from an already-decoded blob — shared by a fresh
+  // capture and by restoring a snapshot taken before add-later opened (the blob
+  // itself is never revoked, so its object URL is still good).
+  function renderPickupPhotoFromBlob(blob) {
+    const url = URL.createObjectURL(blob);
+    heroWrap.classList.add('has-photo');
+    heroWrap.innerHTML = `<img class="hero-photo" src="${url}" alt="Captured photo"><button type="button" class="retake" id="retakeBtn">Retake</button>`;
+    el('retakeBtn').addEventListener('click', resetCamera);
+  }
+
   async function handlePickupFile(file) {
     markInteraction();
     state.capturedAt = new Date().toISOString();
@@ -385,10 +395,7 @@
       blob = file;
     }
     state.photoBlob = blob;
-    const url = URL.createObjectURL(blob);
-    heroWrap.classList.add('has-photo');
-    heroWrap.innerHTML = `<img class="hero-photo" src="${url}" alt="Captured photo"><button type="button" class="retake" id="retakeBtn">Retake</button>`;
-    el('retakeBtn').addEventListener('click', resetCamera);
+    renderPickupPhotoFromBlob(blob);
     updateSaveEnabled();
   }
   wireCameraInput();
@@ -471,6 +478,16 @@
     return state.mode === 'addLater' ? laState.photoBlob : state.ticketPhotoBlob;
   }
 
+  // Renders a ticket photo from an already-decoded blob — shared by a fresh
+  // capture, by restoring a snapshot, and by carrying an already-taken ticket
+  // photo into add-later mode when only the net weight was missing.
+  function renderTicketPhotoFromBlob(blob) {
+    const url = URL.createObjectURL(blob);
+    ticketSlotWrap.classList.add('has-photo');
+    ticketSlotWrap.innerHTML = `<img class="slot-photo" src="${url}" alt="Ticket photo"><button type="button" class="retake" id="ticketRetakeBtn">Retake</button>`;
+    el('ticketRetakeBtn').addEventListener('click', resetTicketPhoto);
+  }
+
   async function handleTicketFile(file) {
     markTicketInteraction();
     let blob;
@@ -481,10 +498,7 @@
     }
     if (state.mode === 'addLater') laState.photoBlob = blob;
     else state.ticketPhotoBlob = blob;
-    const url = URL.createObjectURL(blob);
-    ticketSlotWrap.classList.add('has-photo');
-    ticketSlotWrap.innerHTML = `<img class="slot-photo" src="${url}" alt="Ticket photo"><button type="button" class="retake" id="ticketRetakeBtn">Retake</button>`;
-    el('ticketRetakeBtn').addEventListener('click', resetTicketPhoto);
+    renderTicketPhotoFromBlob(blob);
     updateWeightVisibility();
     updateSaveEnabled();
   }
@@ -686,11 +700,13 @@
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
     hideError();
+    // Stop the ticket timer at the tap, before the (up to 2.5s) GPS wait below —
+    // it measures the driver, not however long a location fix takes.
+    const hasTicketPhoto = !!state.ticketPhotoBlob;
+    const ticketMs = hasTicketPhoto ? Date.now() - (state.ticketT0 || Date.now()) : null;
+    const netValid = hasTicketPhoto && validNet(netLbInput.value.trim());
     await waitForGps(2500);
     const captureMs = Date.now() - (state.t0 || Date.now());
-    const hasTicketPhoto = !!state.ticketPhotoBlob;
-    const netValid = hasTicketPhoto && validNet(netLbInput.value.trim());
-    const ticketMs = hasTicketPhoto ? Date.now() - (state.ticketT0 || Date.now()) : null;
 
     const stop = findStopFor(state.address, state.container);
     const pricing = stop && typeof stop.includedLb === 'number' && typeof stop.ratePerTon === 'number'
@@ -736,6 +752,9 @@
     }
 
     // The record exists from here on; a ticket failure never re-shows the capture screen.
+    // POST /api/records returns only {id, url} — no photoUrl — so the just-taken pickup
+    // blob (and, if present, the ticket photo/weights not yet valid enough to send) are
+    // carried on the record object itself for "Add ticket now" to reuse without a GET.
     const effectivePricing = pricing || { includedLb: 2000, ratePerTon: 95 };
     const newRec = {
       id: recordId,
@@ -744,6 +763,7 @@
       container: payload.container,
       status: payload.status,
       photoUrl: null,
+      photoBlob: state.photoBlob,
       ticket: null,
       pricing: effectivePricing,
     };
@@ -787,6 +807,15 @@
       ticketOutcome = 'later';
     }
 
+    // Carry an already-taken ticket photo (and any gross/tare/facility) forward so
+    // "Add ticket now" only ever has to ask for what's actually missing.
+    if (hasTicketPhoto && ticketOutcome !== 'ok') {
+      newRec.ticketPhotoBlob = state.ticketPhotoBlob;
+      newRec.ticketGross = grossInput.value;
+      newRec.ticketTare = tareInput.value;
+      newRec.ticketFacility = facilityInput.value;
+    }
+
     renderAwaiting();
     showConfirmOneGo({ id: recordId, url: recordUrl, captureMs, netLb, ticketOutcome, ticketErrText, record: newRec });
   }
@@ -823,10 +852,14 @@
       const { overLb, span } = overageLine(netLb, record.pricing);
       if (overLb > 0) savedSlots.appendChild(span);
     } else {
+      // A record whose status isn't collected/removed can never take a ticket —
+      // "add later" would be a promise the app can't keep, so it reads differently
+      // and never offers "Add ticket now" below.
+      const canEverAttach = record.status === 'collected' || record.status === 'removed';
       savedSlots.append(' · ');
       const t = document.createElement('span');
       t.className = 'dim';
-      t.textContent = 'Ticket — add later';
+      t.textContent = canEverAttach ? 'Ticket — add later' : 'Ticket — not attached';
       savedSlots.appendChild(t);
       if (ticketOutcome === 'failed') {
         savedTicketError.textContent = `Saved. Ticket not attached: ${ticketErrText}`;
@@ -920,7 +953,9 @@
     const img = document.createElement('img');
     img.className = 'hero-photo';
     img.alt = '';
-    img.src = record.photoUrl || '';
+    // POST /api/records returns only {id, url}, no photoUrl — a record saved this
+    // session still has its blob in memory, so prefer that over an unset photoUrl.
+    img.src = record.photoBlob ? URL.createObjectURL(record.photoBlob) : (record.photoUrl || '');
     const tag = document.createElement('span');
     tag.className = 'hero-tag';
     tag.textContent = `Pickup · ${formatTime(record.capturedAt)}`;
@@ -930,7 +965,104 @@
 
   const STATUS_LABEL = { collected: 'Collected', delivered: 'Delivered', removed: 'Removed', not_collected: "Couldn't" };
 
+  // The capture screen's in-progress state, captured the instant before add-later
+  // takes over the shared DOM (hero, ticket slot, weight inputs, status, note).
+  // Add-later's own inputs never write into this object — it is only written by
+  // snapshotCaptureScreen() and only read/cleared by restoreCaptureScreen(), so
+  // whatever the driver types while inside add-later can never leak into it.
+  const captureSnapshot = {
+    photoBlob: null,
+    ticketPhotoBlob: null,
+    netLb: '', grossLb: '', tareLb: '', facility: '', moreOpen: false,
+    status: 'collected', reason: null,
+    note: '', noteInputValue: '', noteOpen: false,
+    t0: null, ticketT0: null,
+    address: '', container: null, routeOrder: null, stopSource: null, capturedAt: null,
+  };
+
+  function snapshotCaptureScreen() {
+    captureSnapshot.photoBlob = state.photoBlob;
+    captureSnapshot.ticketPhotoBlob = state.ticketPhotoBlob;
+    captureSnapshot.netLb = netLbInput.value;
+    captureSnapshot.grossLb = grossInput.value;
+    captureSnapshot.tareLb = tareInput.value;
+    captureSnapshot.facility = facilityInput.value;
+    captureSnapshot.moreOpen = !moreBlock.classList.contains('hidden');
+    captureSnapshot.status = state.status;
+    captureSnapshot.reason = state.reason;
+    captureSnapshot.note = state.note;
+    captureSnapshot.noteInputValue = noteInput.value;
+    captureSnapshot.noteOpen = !noteInput.classList.contains('hidden');
+    captureSnapshot.t0 = state.t0;
+    captureSnapshot.ticketT0 = state.ticketT0;
+    captureSnapshot.address = state.address;
+    captureSnapshot.container = state.container;
+    captureSnapshot.routeOrder = state.routeOrder;
+    captureSnapshot.stopSource = state.stopSource;
+    captureSnapshot.capturedAt = state.capturedAt;
+  }
+
+  // Puts the capture screen back exactly as snapshotCaptureScreen() found it —
+  // pickup photo, ticket photo, typed weights, status, reason, note, both timers
+  // and the selected stop — instead of resetting it blank.
+  function restoreCaptureScreen() {
+    state.photoBlob = captureSnapshot.photoBlob;
+    if (state.photoBlob) {
+      renderPickupPhotoFromBlob(state.photoBlob);
+    } else {
+      heroWrap.innerHTML = heroEmptyHtml;
+      heroWrap.classList.remove('has-photo', 'locked');
+      wireCameraInput();
+    }
+
+    state.ticketPhotoBlob = captureSnapshot.ticketPhotoBlob;
+    if (state.ticketPhotoBlob) {
+      renderTicketPhotoFromBlob(state.ticketPhotoBlob);
+    } else {
+      // #ticketSlotSub only exists in the empty-slot markup — the has-photo markup
+      // has no subtitle line, so it must not be touched in that branch.
+      ticketSlotWrap.innerHTML = ticketSlotEmptyHtml;
+      ticketSlotWrap.classList.remove('has-photo');
+      wireTicketCameraInput();
+      el('ticketSlotSub').textContent = currentTicketSub();
+    }
+
+    netLbInput.value = captureSnapshot.netLb;
+    grossInput.value = captureSnapshot.grossLb;
+    tareInput.value = captureSnapshot.tareLb;
+    facilityInput.value = captureSnapshot.facility;
+    moreBlock.classList.toggle('hidden', !captureSnapshot.moreOpen);
+    moreToggle.textContent = captureSnapshot.moreOpen ? '− Gross / tare / facility' : '+ Gross / tare / facility';
+
+    state.status = captureSnapshot.status;
+    state.reason = captureSnapshot.reason;
+    [...statusRow.children].forEach((c) => {
+      const on = c.dataset.status === state.status;
+      c.classList.toggle('on', on);
+      c.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    reasonRow.classList.toggle('hidden', state.status !== 'not_collected');
+    [...reasonRow.children].forEach((c) => c.classList.toggle('on', c.dataset.reason === state.reason));
+
+    state.note = captureSnapshot.note;
+    noteInput.value = captureSnapshot.noteInputValue;
+    noteInput.classList.toggle('hidden', !captureSnapshot.noteOpen);
+
+    state.t0 = captureSnapshot.t0;
+    state.ticketT0 = captureSnapshot.ticketT0;
+    state.address = captureSnapshot.address;
+    state.container = captureSnapshot.container;
+    state.routeOrder = captureSnapshot.routeOrder;
+    state.stopSource = captureSnapshot.stopSource;
+    state.capturedAt = captureSnapshot.capturedAt;
+
+    updateWeightVisibility();
+    updateSaveEnabled();
+  }
+
   function openAddLater(record, returnTo) {
+    snapshotCaptureScreen();
+
     state.mode = 'addLater';
     laState.record = record;
     laState.photoBlob = null;
@@ -951,16 +1083,32 @@
 
     noteRow.classList.add('hidden');
 
-    resetTicketSlot();
+    // A one-go save that took a ticket photo but had no valid net weight already
+    // has that photo (and any gross/tare/facility) in memory — carry it in so
+    // only the net weight is missing, instead of making the driver retake it.
+    if (record.ticketPhotoBlob) {
+      laState.photoBlob = record.ticketPhotoBlob;
+      renderTicketPhotoFromBlob(record.ticketPhotoBlob);
+      netLbInput.value = '';
+      grossInput.value = record.ticketGross || '';
+      tareInput.value = record.ticketTare || '';
+      facilityInput.value = record.ticketFacility || '';
+      const hasMore = !!(record.ticketGross || record.ticketTare || record.ticketFacility);
+      moreBlock.classList.toggle('hidden', !hasMore);
+      moreToggle.textContent = hasMore ? '− Gross / tare / facility' : '+ Gross / tare / facility';
+      updateWeightVisibility();
+      updateSaveEnabled();
+    } else {
+      resetTicketSlot();
+    }
 
     saveBtn.textContent = 'Save ticket';
-    saveBtn.disabled = true;
     hideError();
 
     captureView.classList.remove('hidden');
     confirmView.classList.add('hidden');
 
-    // Ticket slot gets focus on open.
+    // Ticket slot gets focus (and is keyboard-focusable) on open.
     requestAnimationFrame(() => {
       ticketSlotWrap.scrollIntoView({ block: 'center' });
       const camBtn = el('ticketCameraBtn');
@@ -987,24 +1135,25 @@
 
   // Back leaves whichever view opened the add-later screen exactly as it was —
   // never resetForNext, so an in-progress pickup underneath survives a
-  // mistaken open, and a failed Save doesn't strand the driver here.
+  // mistaken open (restored from the snapshot, not reset), and a failed Save
+  // doesn't strand the driver here.
   function closeAddLater() {
     const returnTo = laState.returnTo;
     exitAddLaterUI();
 
-    resetCamera();
-    resetTicketSlot();
+    restoreCaptureScreen();
     saveBtn.textContent = 'Save record';
     hideError();
     renderStopCard();
     renderRoute();
-    updateSaveEnabled();
 
-    captureView.classList.remove('hidden');
+    // Exactly one of the two views is shown — never both stacked.
     if (returnTo === 'confirm') {
+      captureView.classList.add('hidden');
       confirmView.classList.remove('hidden');
     } else {
       confirmView.classList.add('hidden');
+      captureView.classList.remove('hidden');
     }
   }
   backBtn.addEventListener('click', closeAddLater);

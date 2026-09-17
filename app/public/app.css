@@ -613,6 +613,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .slot .retake { position: absolute; right: 10px; bottom: 10px; font: inherit; font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 9px; border: 1px solid var(--border); background: rgba(11,13,15,.85); color: var(--text); cursor: pointer; }
 .slot-k { margin: 14px 16px 0; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); font-weight: 600; }
 .slot-k + .slot, .slot-k + .hero { margin-top: 8px; }
+.slot:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .hero.locked .hero-tag, .slot.locked .hero-tag { position: absolute; left: 10px; bottom: 10px; font-size: 13px; font-weight: 600; padding: 6px 10px; border-radius: 9px; background: rgba(11,13,15,.85); color: var(--text); border: 1px solid var(--border); }
 .status-static { font-size: 17px; font-weight: 600; padding: 12px 0 0; }
 .save-error { margin: 10px 16px 0; color: var(--red); font-size: 15px; }
