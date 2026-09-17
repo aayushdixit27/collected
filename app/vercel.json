@@ -1,6 +1,16 @@
 {
   "rewrites": [
-    { "source": "/p/:id", "destination": "/p.html" },
-    { "source": "/office", "destination": "/office.html" }
+    {
+      "source": "/p/:id",
+      "destination": "/p.html"
+    },
+    {
+      "source": "/office",
+      "destination": "/office.html"
+    },
+    {
+      "source": "/walkthrough",
+      "destination": "/walkthrough.html"
+    }
   ]
 }

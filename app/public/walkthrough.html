@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Collected — walkthrough</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--paper:#fff;--ink:#141414;--ink2:#3d3d3d;--rule:#d6d2c9;--accent:#2F2A90}
+html{background:var(--paper)}body{margin:0;color:var(--ink);font:17px/1.5 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;max-width:680px;padding:36px 20px 64px;margin:0 auto}
+h1{font-size:30px;margin:0 0 2px;letter-spacing:-.01em}.tag{color:var(--ink2);margin:0 0 24px}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin:28px 0 8px;border-top:1px solid var(--rule);padding-top:16px}
+p{margin:0 0 10px}.big{font-size:22px;line-height:1.3;font-weight:600;margin:4px 0 8px}
+blockquote{margin:10px 0;padding:8px 14px;border-left:3px solid var(--accent);color:var(--ink2);font-style:italic}
+ul{padding-left:20px;margin:0}li{margin:0 0 6px}
+.receipt{font:15px ui-monospace,Menlo,monospace;background:#f1efe9;padding:12px 16px;border-radius:4px;margin:8px 0 10px;white-space:pre;overflow-x:auto}
+.try{margin-top:24px;padding:20px;border:2px solid var(--accent);border-radius:6px}
+.try a{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:600;padding:12px 16px;border-radius:4px;margin:6px 6px 0 0}
+.try .big{color:var(--accent);margin-top:0}kbd{font:14px ui-monospace,Menlo,monospace;background:#f1efe9;padding:1px 5px;border-radius:3px}
+small{color:var(--ink2)}
+</style></head><body>
+<h1>Collected</h1>
+<p class="tag">The weight ticket, tied to your container. A two-hour take-home for a waste-hauling platform, and what it turned into.</p>
+
+<h2>The problem</h2>
+<p class="big">The record exists and cannot be tied to the customer.</p>
+<p>A roll-off hauler dumps at someone else's transfer station. The scale house prints a paper ticket — gross, tare, net — with no container and no customer on it. Three weeks later an overage charge lands. The customer asks for proof, gets that ticket, and cannot tell it was their load.</p>
+<blockquote>"The weight ticket provided did not have any identifying information that it belonged to our reserved container. I cannot confirm it was actually our ticket." — a customer, public review, August 2026</blockquote>
+
+<h2>What it does</h2>
+<p>The stop is the record. The driver takes the pickup photo and, at the scale, the ticket photo plus one number — the net weight. The office finds any pull weeks later by address and date. The customer gets a page they can check:</p>
+<div class="receipt">Pickup   1428 Mission College Blvd · RO-20-114 · Aug 12, 6:36 AM
+Ticket   Zanker Road Transfer Station · 7:41 AM (+64 min)
+         Gross 19,860 lb   Tare 14,520 lb   Net 5,340 lb
+Charge   5,340 − 2,000 included = 3,340 lb over
+         3,340 ÷ 2,000 × $95.00/ton = $158.65</div>
+
+<h2>Three product decisions</h2>
+<ul>
+<li><strong>Retrieval, not capture.</strong> The platform's own driver app already photographs the pickup. The paper ticket from a third-party scale, tied to the container and shown to the customer with the arithmetic, is the part nobody hands over.</li>
+<li><strong>Never trade capture speed.</strong> Pickup under ten seconds; the ticket is one photo and one number. A field that improves the record but slows the driver loses.</li>
+<li><strong>Say what was not checked.</strong> No hauler has been spoken to. Real phone captures ran 22–40 s against the 10 s target. Storage was redesigned on 17 Sep after it lost records under two devices writing at once.</li>
+</ul>
+
+<div class="try">
+<p class="big">Try it — three screens, one record.</p>
+<a href="/">Driver · record a pull</a>
+<a href="/office">Office · find it</a>
+<a href="/p/260812-nycx">Customer · the page</a>
+<p style="margin-top:12px"><small>Driver: pick any stop, use <kbd>choose from library</kbd> for the pickup photo, and again for the ticket, type <kbd>5340</kbd> as the net weight, Save. Copy the link and open it — that is what the customer sees. Then find your record in the office by address. Seeded data; photos labelled synthetic.</small></p>
+</div>
+
+<h2>How it was built</h2>
+<p><small>Spec before code. Three parallel coding agents, each owning disjoint files, built the ticket feature from one contract in about an hour; each agent's work went through an independent reviewer, and a fresh-context review of the merged result found five defects before deploy. Their briefs, findings and reviews live in a shared <strong>Senso</strong> folder — the context layer the agents and I read and write, so a new session picks up the state without a transcript. The record store is Vercel Blob with write-once files; a real product would put records in Postgres and keep Blob for photos.</small></p>
+</body></html>

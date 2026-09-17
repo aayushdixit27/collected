@@ -98,6 +98,10 @@ const server = http.createServer(async (req, res) => {
       await serveStatic(path.join(PUBLIC_DIR, 'office.html'), res);
       return;
     }
+    if (pathname === '/walkthrough') {
+      await serveStatic(path.join(PUBLIC_DIR, 'walkthrough.html'), res);
+      return;
+    }
     if (/^\/p\/[^/]+$/.test(pathname)) {
       await serveStatic(path.join(PUBLIC_DIR, 'p.html'), res);
       return;
