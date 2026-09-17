@@ -1,36 +1,21 @@
-// In-memory stand-in for the `@vercel/blob` calls lib/store.js makes (put, list, head) plus
-// the `fetch` it uses to read a blob body. Handed to `_setBlobClientForTests()` so the Blob
+// In-memory stand-in for the `@vercel/blob` calls lib/store.js makes (put, list) plus the
+// `fetch` it uses to read a blob body. Handed to `_setBlobClientForTests()` so the Blob
 // code path runs without a token. Faithful where it matters for the tests: deterministic
 // URLs (`${base}/${pathname}` when addRandomSuffix is false, `-<suffix>` before the
-// extension when true), put refusing to overwrite unless `allowOverwrite: true` (same
-// message the SDK surfaces), an ETag per version returned by put/head and as the `ETag`
-// header on fetch, `ifMatch` rejected on mismatch with a `BlobPreconditionFailedError` of
-// the SDK's message (and the SDK's "contradictory" error when paired with
-// `allowOverwrite: false`), list() with prefix + cursor pagination, fetch answering 404 for
-// a missing pathname and ignoring the query.
+// extension when true), put on an existing key throwing the SDK's already-exists error
+// unless `allowOverwrite: true` is passed, list() with prefix + cursor pagination, fetch
+// answering 404 for a missing pathname (never cached, as measured on production) and
+// ignoring the query string (as measured: the edge does too).
 //
 // What it does NOT simulate, and so what these tests cannot prove:
 // - list() eventual consistency (here a put is visible to list() immediately);
-// - the CDN in front of blob URLs (here a fetch always sees the latest body, so the
-//   cacheControlMaxAge / cache-bust handling is exercised but its effect is not);
+// - the CDN in front of blob URLs (here a fetch always sees the latest body; with every
+//   blob write-once that is also what production does, but the fake cannot prove it);
 // - multiple serverless instances (one process; `_setBlobClientForTests` re-injecting the
 //   same fake is the closest thing to a cold start);
 // - network partitions mid-request, rate limits, token/permission errors.
-// Same shape as the SDK's: extends Error, no custom name, message prefixed "Vercel Blob: ".
-export class BlobPreconditionFailedError extends Error {
-  constructor() {
-    super('Vercel Blob: Precondition failed: ETag mismatch.');
-  }
-}
-
-let etagCounter = 0;
-function newEtag() {
-  etagCounter += 1;
-  return `"fake-etag-${etagCounter}"`;
-}
-
 export function createFakeBlob({ base = 'https://fake.public.blob.vercel-storage.com', pageSize = 1000 } = {}) {
-  const blobs = new Map(); // pathname -> { body: Buffer, contentType, uploadedAt, options, etag }
+  const blobs = new Map(); // pathname -> { body: Buffer, contentType, uploadedAt, options }
   const puts = []; // every put attempt, in order: { pathname, options, ok }
   const fail = { list: false, fetch: false, put: false };
   // Pathnames that list() (hiddenFromList) or fetch() (hiddenFromFetch) pretend not to
@@ -38,9 +23,6 @@ export function createFakeBlob({ base = 'https://fake.public.blob.vercel-storage
   // stale edge behind a write.
   const hiddenFromList = new Set();
   const hiddenFromFetch = new Set();
-  // Pathnames whose fetch() keeps serving a snapshot taken at freezeFetch() time while
-  // put()/head() see the live version: a stale edge cache in front of an overwritten blob.
-  const frozen = new Map();
 
   function urlFor(pathname) {
     return `${base}/${pathname}`;
@@ -68,38 +50,20 @@ export function createFakeBlob({ base = 'https://fake.public.blob.vercel-storage
       const suffix = Math.random().toString(36).slice(2, 12);
       pathname = dot === -1 ? `${pathname}-${suffix}` : `${pathname.slice(0, dot)}-${suffix}${pathname.slice(dot)}`;
     }
-    if (options.ifMatch && options.allowOverwrite === false) {
-      throw new Error('Vercel Blob: ifMatch and allowOverwrite: false are contradictory. ifMatch is used for conditional overwrites, which requires allowOverwrite to be true.');
-    }
-    const existing = blobs.get(pathname);
-    if (options.ifMatch) {
-      if (!existing || existing.etag !== options.ifMatch) {
-        puts.push({ pathname, options, ok: false });
-        throw new BlobPreconditionFailedError();
-      }
-    } else if (existing && options.allowOverwrite !== true) {
+    // Same as the SDK: the default is no overwrite, and an existing key is a BlobError.
+    if (blobs.has(pathname) && options.allowOverwrite !== true) {
       puts.push({ pathname, options, ok: false });
       throw new Error('Vercel Blob: This blob already exists, use `allowOverwrite: true` if you want to overwrite it');
     }
     const buf = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
-    const etag = newEtag();
     blobs.set(pathname, {
       body: buf,
       contentType: options.contentType || 'application/octet-stream',
       uploadedAt: new Date(),
       options,
-      etag,
     });
     puts.push({ pathname, options, ok: true });
-    return { url: urlFor(pathname), downloadUrl: `${urlFor(pathname)}?download=1`, pathname, contentType: options.contentType, contentDisposition: 'inline', etag };
-  }
-
-  async function head(urlOrPathname) {
-    if (fail.list) throw new Error('Vercel Blob: head failed (fake 503)');
-    const pathname = urlOrPathname.startsWith('http') ? new URL(urlOrPathname).pathname.replace(/^\//, '') : urlOrPathname;
-    const b = blobs.get(pathname);
-    if (!b) throw new Error('Vercel Blob: The requested blob does not exist');
-    return { ...entry(pathname), contentType: b.contentType, contentDisposition: 'inline', cacheControl: '', etag: b.etag };
+    return { url: urlFor(pathname), downloadUrl: `${urlFor(pathname)}?download=1`, pathname, contentType: options.contentType, contentDisposition: 'inline' };
   }
 
   async function list({ prefix = '', cursor, limit } = {}) {
@@ -120,26 +84,15 @@ export function createFakeBlob({ base = 'https://fake.public.blob.vercel-storage
     const u = new URL(url);
     if (u.origin !== base) return new Response('wrong host', { status: 404 });
     const pathname = u.pathname.replace(/^\//, '');
-    const b = hiddenFromFetch.has(pathname) ? null : frozen.get(pathname) || blobs.get(pathname);
+    const b = hiddenFromFetch.has(pathname) ? null : blobs.get(pathname);
     if (!b) return new Response('The requested blob does not exist (fake)', { status: 404 });
-    return new Response(b.body, { status: 200, headers: { 'content-type': b.contentType, etag: b.etag } });
+    return new Response(b.body, { status: 200, headers: { 'content-type': b.contentType } });
   }
 
   // Test helpers (not part of the SDK surface).
   function seed(pathname, body, { contentType = 'application/json', uploadedAt = new Date() } = {}) {
     const buf = Buffer.isBuffer(body) ? body : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
-    blobs.set(pathname, { body: buf, contentType, uploadedAt, options: {}, etag: newEtag() });
-  }
-  function freezeFetch(pathname) {
-    const b = blobs.get(pathname);
-    if (b) frozen.set(pathname, { ...b });
-  }
-  function unfreezeFetch(pathname) {
-    frozen.delete(pathname);
-  }
-  function etagOf(pathname) {
-    const b = blobs.get(pathname);
-    return b ? b.etag : null;
+    blobs.set(pathname, { body: buf, contentType, uploadedAt, options: {} });
   }
   function readJson(pathname) {
     const b = blobs.get(pathname);
@@ -149,5 +102,5 @@ export function createFakeBlob({ base = 'https://fake.public.blob.vercel-storage
     return Array.from(blobs.keys()).filter((p) => p.startsWith(prefix)).sort();
   }
 
-  return { put, list, head, fetch, BlobPreconditionFailedError, base, blobs, puts, fail, hiddenFromList, hiddenFromFetch, freezeFetch, unfreezeFetch, seed, readJson, keys, etagOf };
+  return { put, list, fetch, base, blobs, puts, fail, hiddenFromList, hiddenFromFetch, seed, readJson, keys };
 }

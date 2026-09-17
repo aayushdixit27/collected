@@ -245,81 +245,72 @@ async function testBlobBackend() {
       ok(seedPuts(fake).length === 1, 'blob: a cold start on a store with a seed does not rewrite it');
 
       const ids = await testConcurrency(base, 'blob');
-      ok(fake.keys('collected/records/').length === 6, `blob: six records/ blobs after six creates+tickets (got ${fake.keys('collected/records/').length})`);
+      ok(fake.keys('collected/records/').length === 12, `blob: 6 record files + 6 ticket files under records/ after six creates+tickets (got ${fake.keys('collected/records/').length})`);
       ok(fake.keys('collected/photos/').length === 6 && fake.keys('collected/tickets/').length === 6, 'blob: six photo blobs and six ticket blobs');
       ok(fake.keys('collected/index-').length === 0, 'blob: no index-*.json is ever written');
       const recPuts = fake.puts.filter((p) => p.pathname.startsWith('collected/records/'));
-      ok(recPuts.every((p) => p.options.addRandomSuffix === false && p.options.cacheControlMaxAge === 60), 'blob: every records/ put uses addRandomSuffix:false and cacheControlMaxAge 60');
-      ok(recPuts.length === 12, `blob: 12 records/ puts for 6 creates + 6 tickets (got ${recPuts.length})`);
-      const createPuts = recPuts.filter((p) => p.options.ifMatch === undefined);
-      const ticketPuts = recPuts.filter((p) => p.options.ifMatch !== undefined);
-      ok(createPuts.length === 6 && createPuts.every((p) => p.options.allowOverwrite === false), 'blob: the 6 create puts use allowOverwrite:false (a duplicate id can never overwrite a record)');
-      ok(ticketPuts.length === 6 && ticketPuts.every((p) => typeof p.options.ifMatch === 'string' && p.options.ifMatch.length > 0), 'blob: the 6 ticket puts are guarded with ifMatch: <etag read>');
+      ok(recPuts.every((p) => p.options.addRandomSuffix === false && p.options.allowOverwrite === false && p.options.cacheControlMaxAge === 60 && p.options.ifMatch === undefined), 'blob: every records/ put is write-once (allowOverwrite:false, no ifMatch), addRandomSuffix:false, cacheControlMaxAge 60');
+      ok(recPuts.length === 12 && recPuts.every((p) => p.ok), `blob: 12 records/ puts for 6 creates + 6 tickets, none refused (got ${recPuts.length})`);
+      ok(ids.every((id) => fake.readJson(`collected/records/${id}.json`).ticket === null), 'blob: record files are never rewritten (ticket still null in the record file)');
+      ok(ids.every((id) => /\/collected\/tickets\/.+-[a-z0-9]+\.jpg$/.test((fake.readJson(`collected/records/${id}.ticket.json`) || {}).photoUrl)), 'blob: each ticket lives in <id>.ticket.json and carries the absolute suffixed JPEG URL');
       ok(fake.keys('collected/tickets/').every((k) => /^collected\/tickets\/[^/]+-[a-z0-9]+\.jpg$/.test(k)), 'blob: ticket JPEGs are stored with a random suffix');
-      ok(ids.every((id) => /\/collected\/tickets\/.+-[a-z0-9]+\.jpg$/.test(fake.readJson(`collected/records/${id}.json`).ticket.photoUrl)), 'blob: each record carries the absolute suffixed ticket URL');
+
+      // Brief: create -> read-by-id immediately, attach -> read-by-id immediately shows the
+      // ticket. `recent` is cleared before each read so this is the deterministic-URL path
+      // alone (no list(), no cache-bust exists any more).
+      const immRes = await postRecord(base, 31);
+      const imm = await immRes.json();
+      store._clearRecentForTests();
+      const immRead = await (await fetch(`${base}/api/records/${imm.id}`)).json();
+      ok(immRead.id === imm.id && immRead.ticket === null, 'blob: read-by-id immediately after create, recent cleared, returns the record');
+      const immT = await postTicket(base, imm.id, 6100);
+      ok(immT.status === 200, `blob: attach returns 200 (got ${immT.status})`);
+      store._clearRecentForTests();
+      const immRead2 = await (await fetch(`${base}/api/records/${imm.id}`)).json();
+      ok(immRead2.ticket && immRead2.ticket.netLb === 6100, 'blob: read-by-id immediately after attach, recent cleared, no cache-bust, shows the ticket');
+      ok(fake.puts.filter((p) => p.pathname === `collected/records/${imm.id}.json`).length === 1, 'blob: the record file was put exactly once (attach never touches it)');
+      const immList = await (await fetch(`${base}/api/records`)).json();
+      ok(immList.records.find((r) => r.id === imm.id).ticket.netLb === 6100, 'blob: list shows the ticket from <id>.ticket.json, recent cleared');
+
+      // Two attaches on the same record at the same time: the ticket file is write-once,
+      // so exactly one wins and the other is a 409; the record keeps the winner's ticket.
+      const dbl = await (await postRecord(base, 32)).json();
+      const [d1, d2] = await Promise.all([postTicket(base, dbl.id, 8100), postTicket(base, dbl.id, 8200)]);
+      const statuses = [d1.status, d2.status].sort();
+      ok(statuses[0] === 200 && statuses[1] === 409, `blob: two simultaneous attaches on one record give exactly one 200 and one 409 (got ${statuses.join(',')})`);
+      const dblTicket = fake.readJson(`collected/records/${dbl.id}.ticket.json`);
+      const winner = d1.status === 200 ? 8100 : 8200;
+      ok(dblTicket && dblTicket.netLb === winner, `blob: the ticket file holds the winner's ticket (${winner})`);
+      const dblPuts = fake.puts.filter((p) => p.pathname === `collected/records/${dbl.id}.ticket.json`);
+      ok(dblPuts.filter((p) => p.ok).length === 1 && dblPuts.length <= 2, `blob: the ticket file was written exactly once; the loser was refused at the put or by its own pre-read (${dblPuts.length} attempt(s))`);
 
       // Read-by-id from a cold instance: nothing in memory, so this is the deterministic-URL fetch.
       coldStart(fake);
+      const putsBeforeCold = fake.puts.length;
       const coldRead = await fetch(`${base}/api/records/${ids[0]}`);
       const coldData = await coldRead.json();
       ok(coldRead.status === 200 && coldData.ticket && coldData.ticket.netLb === 3000, `blob: cold instance reads a ticketed record by its deterministic URL (got ${coldRead.status})`);
-      ok(fake.puts.length === 25, `blob: the cold read wrote nothing (1 seed + 6 photos + 6 tickets + 12 records = 25 puts, got ${fake.puts.length})`);
+      ok(fake.puts.length === putsBeforeCold, `blob: the cold read wrote nothing (puts still ${putsBeforeCold})`);
 
-      // A ticket on a seed record: the seed blob is untouched; the record gets its own
-      // records/ override with seed: true kept, and the list shows it once, with the ticket.
+      // A ticket on a seed record: the seed blob is untouched, no record file is written; the
+      // ticket lives in <id>.ticket.json and the list shows the seed row once, with it.
       const seedRec = firstData.records.find((r) => r.seed === true && r.status === 'collected' && !r.ticket);
       const seedTicket = await postTicket(base, seedRec.id, 4100);
       ok(seedTicket.status === 200, `blob: ticket on a seed record returns 200 (got ${seedTicket.status})`);
-      const override = fake.readJson(`collected/records/${seedRec.id}.json`);
-      ok(!!override && override.seed === true && override.ticket && override.ticket.netLb === 4100, 'blob: seed record with a ticket gets records/<id>.json with seed:true kept and the ticket');
-      const overridePut = fake.puts.find((p) => p.pathname === `collected/records/${seedRec.id}.json`);
-      ok(overridePut && overridePut.options.allowOverwrite === false && overridePut.options.ifMatch === undefined, "blob: a seed record's first override is put with allowOverwrite:false (no ETag exists yet)");
+      const seedTicketFile = fake.readJson(`collected/records/${seedRec.id}.ticket.json`);
+      ok(!!seedTicketFile && seedTicketFile.netLb === 4100, 'blob: seed record with a ticket gets records/<id>.ticket.json');
+      ok(fake.readJson(`collected/records/${seedRec.id}.json`) === null, 'blob: no record file is written for a seed record');
       ok(seedPuts(fake).length === 1, 'blob: attaching a ticket to a seed record does not rewrite the seed');
       coldStart(fake);
       const afterList = await (await fetch(`${base}/api/records`)).json();
       const seedRows = afterList.records.filter((r) => r.id === seedRec.id);
-      ok(seedRows.length === 1 && seedRows[0].ticket && seedRows[0].ticket.netLb === 4100, 'blob: cold list shows the ticketed seed record exactly once, override winning over the seed row');
+      ok(seedRows.length === 1 && seedRows[0].ticket && seedRows[0].ticket.netLb === 4100 && seedRows[0].seed === true, 'blob: cold list shows the ticketed seed record exactly once, seed row + ticket file');
+      const seedById = await (await fetch(`${base}/api/records/${seedRec.id}`)).json();
+      ok(seedById.seed === true && seedById.ticket && seedById.ticket.netLb === 4100, 'blob: by-id on a seed record merges the seed entry with its ticket file');
       const second = await postTicket(base, seedRec.id, 4200);
       ok(second.status === 409, `blob: second ticket on the same record from a cold instance returns 409 (got ${second.status})`);
       const unknown = await fetch(`${base}/api/records/nope`);
       ok(unknown.status === 404, `blob: GET /api/records/nope returns 404 (got ${unknown.status})`);
-
-      // ETag race (finding 2a): freeze what fetch() serves for a record at its pre-ticket
-      // version. Attach #1 reads ETag e1, puts with ifMatch e1: ok. A cold instance then
-      // reads the same stale copy (no ticket, e1) so the handler's pre-check passes, but its
-      // put with ifMatch e1 hits the origin's e2 and is refused: 409, first ticket kept.
-      const raceRes = await postRecord(base, 41);
-      const race = await raceRes.json();
-      const raceKey = `collected/records/${race.id}.json`;
-      const e1 = fake.etagOf(raceKey);
-      fake.freezeFetch(raceKey);
-      const t1 = await postTicket(base, race.id, 7100);
-      ok(t1.status === 200, `blob race: first ticket attach returns 200 (got ${t1.status})`);
-      const e2 = fake.etagOf(raceKey);
-      ok(e1 && e2 && e1 !== e2, 'blob race: the ticket put produced a new ETag at the origin');
-      coldStart(fake);
-      const stale = await (await fetch(`${base}/api/records/${race.id}`)).json();
-      ok(stale.ticket === null, 'blob race: a cold instance reads the stale pre-ticket copy (frozen fetch)');
-      const t2 = await postTicket(base, race.id, 7200);
-      ok(t2.status === 409, `blob race: second attach with the stale ETag returns 409 (got ${t2.status})`);
-      ok((await t2.json()).error === 'ticket already recorded for this record', 'blob race: 409 body is the existing specific text');
-      const refusedRace = fake.puts.filter((p) => p.pathname === raceKey && p.ok === false);
-      ok(refusedRace.length === 1 && refusedRace[0].options.ifMatch === e1, 'blob race: exactly one put was refused, and it carried the stale ETag');
-      fake.unfreezeFetch(raceKey);
-      const kept = fake.readJson(raceKey);
-      ok(kept.ticket && kept.ticket.netLb === 7100 && fake.etagOf(raceKey) === e2, 'blob race: record keeps the first ticket and its ETag');
-
-      // Same race on a seed record: the override exists at the origin but a stale edge
-      // hides it, so the cold instance sees the seed row and puts with allowOverwrite:false.
-      const seedRec2 = firstData.records.find((r) => r.seed === true && r.status === 'collected' && !r.ticket && r.id !== seedRec.id);
-      const s1 = await postTicket(base, seedRec2.id, 4300);
-      ok(s1.status === 200, `blob race (seed): first attach on a seed record returns 200 (got ${s1.status})`);
-      fake.hiddenFromFetch.add(`collected/records/${seedRec2.id}.json`);
-      coldStart(fake);
-      const s2 = await postTicket(base, seedRec2.id, 4400);
-      ok(s2.status === 409, `blob race (seed): attach on a seed record whose override is hidden by a stale edge returns 409 (got ${s2.status})`);
-      fake.hiddenFromFetch.delete(`collected/records/${seedRec2.id}.json`);
-      ok(fake.readJson(`collected/records/${seedRec2.id}.json`).ticket.netLb === 4300, 'blob race (seed): the first ticket is kept');
 
       // Duplicate id on create (finding 4): pin Math.random so the first generated suffix
       // is '2222' and pre-seed that id. The photo put collides, the id is regenerated, and
@@ -468,6 +459,8 @@ async function testBlobBackend() {
       ok(fake.readJson('collected/records/260911-seed.json') === null, 'blob C: seed:true row in the index is not copied');
       const seedOverride = fake.readJson('collected/records/260812-nycx.json');
       ok(!!seedOverride && seedOverride.seed === true && seedOverride.ticket && seedOverride.ticket.netLb === 6100, 'blob C: seed row with a real (blob) ticket is copied as an override with seed:true kept');
+      const seedOverrideTicket = fake.readJson('collected/records/260812-nycx.ticket.json');
+      ok(!!seedOverrideTicket && seedOverrideTicket.netLb === 6100, 'blob C: round 4 splits that copied row\'s ticket into 260812-nycx.ticket.json in the same pass');
       ok(fake.readJson('collected/records/260901-sgen.json') === null, 'blob C: seed row with a seed-generated svg ticket is not copied');
       const nycxRows = migData.records.filter((r) => r.id === '260812-nycx');
       ok(nycxRows.length === 1 && nycxRows[0].ticket && nycxRows[0].ticket.netLb === 6100, 'blob C: list shows the pinned seed record once, with the migrated real ticket winning');
@@ -501,8 +494,9 @@ async function testBlobBackend() {
       ok(fake.readJson('collected/records/260916-real.json').ticket === null, 'blob C: an orphaned ticket JPEG does not invent ticket fields on the record');
       const reattach = await postTicket(base, '260916-real', 5100);
       ok(reattach.status === 200, `blob C: re-attaching a ticket where an orphan tickets/<id>.jpg exists succeeds (got ${reattach.status})`);
-      const reattached = fake.readJson('collected/records/260916-real.json');
-      ok(reattached.ticket && reattached.ticket.netLb === 5100 && /\/collected\/tickets\/260916-real-[a-z0-9]+\.jpg$/.test(reattached.ticket.photoUrl), `blob C: record.ticket.photoUrl is a new suffixed URL (got ${reattached.ticket && reattached.ticket.photoUrl})`);
+      const reattached = fake.readJson('collected/records/260916-real.ticket.json');
+      ok(reattached && reattached.netLb === 5100 && /\/collected\/tickets\/260916-real-[a-z0-9]+\.jpg$/.test(reattached.photoUrl), `blob C: 260916-real.ticket.json carries a new suffixed JPEG URL (got ${reattached && reattached.photoUrl})`);
+      ok(fake.readJson('collected/records/260916-real.json').ticket === null, 'blob C: the record file was not rewritten by the attach');
       ok(fake.blobs.has('collected/tickets/260916-real.jpg') && fake.keys('collected/tickets/260916-real').length === 2, 'blob C: the orphan JPEG is untouched beside the new one');
 
       // No-clobber: attach a ticket to a migrated record, then hide its records/ blob from
@@ -517,12 +511,60 @@ async function testBlobBackend() {
       fake.hiddenFromList.delete('collected/records/260915-nofl.json');
       fake.hiddenFromFetch.delete('collected/records/260915-nofl.json');
       const kept = fake.readJson('collected/records/260915-nofl.json');
-      ok(!!kept && kept.ticket && kept.ticket.netLb === 5200, 'blob C: migration under lag did not clobber the ticketed record (allowOverwrite:false backstop)');
+      const keptTicket = fake.readJson('collected/records/260915-nofl.ticket.json');
+      ok(!!kept && kept.address === '6 Pre-flag Capture Rd' && keptTicket && keptTicket.netLb === 5200, 'blob C: migration under lag did not clobber the record file or its ticket file (allowOverwrite:false backstop)');
       const refused = fake.puts.filter((p) => p.pathname === 'collected/records/260915-nofl.json' && p.ok === false);
       ok(refused.length === 1, `blob C: exactly one refused overwrite attempt was made and swallowed (got ${refused.length})`);
       coldStart(fake);
       const finalRead = await (await fetch(`${base}/api/records/260915-nofl`)).json();
       ok(finalRead.ticket && finalRead.ticket.netLb === 5200, 'blob C: after lag clears the ticketed record reads back intact');
+    }
+
+    // E. round-4 migration off round 3's layout (ticket embedded in the record file).
+    {
+      const fake = createFakeBlob();
+      const jpg = Buffer.from(TINY_JPEG_B64, 'base64');
+      const tk = (net) => ({ photoUrl: `${fake.base}/collected/tickets/x-${net}.jpg`, netLb: net, grossLb: null, tareLb: null, facility: 'Old Layout TS', weighedAt: '2026-09-17T20:00:00.000Z', gps: null, ticketMs: null });
+      // embedded ticket, no ticket file: must be split out
+      fake.seed('collected/records/260917-emb1.json', { id: '260917-emb1', address: 'Embedded ticket', status: 'collected', capturedAt: '2026-09-17T19:00:00.000Z', photoUrl: `${fake.base}/collected/photos/260917-emb1.jpg`, seed: false, pricing: { includedLb: 2000, ratePerTon: 95 }, ticket: tk(1000) });
+      fake.seed('collected/photos/260917-emb1.jpg', jpg, { contentType: 'image/jpeg' });
+      // embedded ticket AND a ticket file that disagrees: the file wins, nothing is rewritten
+      fake.seed('collected/records/260917-both.json', { id: '260917-both', address: 'Both', status: 'collected', capturedAt: '2026-09-17T19:10:00.000Z', photoUrl: `${fake.base}/collected/photos/260917-both.jpg`, seed: false, ticket: tk(1000) });
+      fake.seed('collected/records/260917-both.ticket.json', tk(2000));
+      fake.seed('collected/photos/260917-both.jpg', jpg, { contentType: 'image/jpeg' });
+      // no ticket at all: nothing to split
+      fake.seed('collected/records/260917-none.json', { id: '260917-none', address: 'No ticket', status: 'collected', capturedAt: '2026-09-17T19:20:00.000Z', photoUrl: `${fake.base}/collected/photos/260917-none.jpg`, seed: false, ticket: null });
+      fake.seed('collected/photos/260917-none.jpg', jpg, { contentType: 'image/jpeg' });
+      coldStart(fake);
+
+      const e = await fetch(`${base}/api/records`);
+      ok(e.status === 200, `blob E: first request on a round-3 layout returns 200 (got ${e.status})`);
+      const split = fake.readJson('collected/records/260917-emb1.ticket.json');
+      ok(!!split && split.netLb === 1000 && split.facility === 'Old Layout TS', 'blob E: migration writes <id>.ticket.json from the embedded ticket');
+      const splitPut = fake.puts.find((p) => p.pathname === 'collected/records/260917-emb1.ticket.json');
+      ok(splitPut && splitPut.ok && splitPut.options.allowOverwrite === false, 'blob E: the split is write-once');
+      ok(fake.readJson('collected/records/260917-emb1.json').ticket.netLb === 1000, 'blob E: the record file is left as is (embedded ticket still there)');
+      ok(fake.readJson('collected/records/260917-both.ticket.json').netLb === 2000 && !fake.puts.some((p) => p.pathname === 'collected/records/260917-both.ticket.json'), 'blob E: an existing ticket file is neither rewritten nor re-put');
+      ok(!fake.blobs.has('collected/records/260917-none.ticket.json'), 'blob E: no ticket file for a record without a ticket');
+      ok(!fake.puts.some((p) => p.pathname.endsWith('260917-emb1.json') || p.pathname.endsWith('260917-both.json') || p.pathname.endsWith('260917-none.json')), 'blob E: no record file was put');
+
+      const byIdBoth = await (await fetch(`${base}/api/records/260917-both`)).json();
+      ok(byIdBoth.ticket && byIdBoth.ticket.netLb === 2000, 'blob E: by-id prefers <id>.ticket.json over the embedded ticket');
+      const listE = await (await fetch(`${base}/api/records`)).json();
+      ok(listE.records.find((r) => r.id === '260917-both').ticket.netLb === 2000, 'blob E: list prefers <id>.ticket.json over the embedded ticket');
+      ok(listE.records.find((r) => r.id === '260917-emb1').ticket.netLb === 1000, 'blob E: a split ticket reads back through the ticket file');
+      // Fallback: embedded ticket used only when no ticket file exists (hide the file).
+      fake.hiddenFromFetch.add('collected/records/260917-both.ticket.json');
+      coldStart(fake);
+      const fb = await (await fetch(`${base}/api/records/260917-both`)).json();
+      ok(fb.ticket && fb.ticket.netLb === 1000, 'blob E: with the ticket file unreachable the embedded ticket is the fallback');
+      fake.hiddenFromFetch.delete('collected/records/260917-both.ticket.json');
+      const putsE = fake.puts.length;
+      coldStart(fake);
+      await fetch(`${base}/api/records`);
+      ok(fake.puts.length === putsE, 'blob E: a second cold start has nothing left to split');
+      const re = await postTicket(base, '260917-emb1', 3000);
+      ok(re.status === 409, `blob E: re-attach on a migrated embedded ticket returns 409 (got ${re.status})`);
     }
   } catch (err) {
     failures += 1;
