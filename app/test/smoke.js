@@ -49,6 +49,57 @@ async function waitForServer(base, tries = 50) {
   throw new Error('server did not start in time');
 }
 
+function postRecord(base, n) {
+  return fetch(`${base}/api/records`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      address: `${n} Parallel Way, Columbus, OH 43215`,
+      container: `RO-30-${n}`,
+      status: 'collected',
+      capturedAt: new Date(Date.now() - n * 1000).toISOString(),
+      captureMs: 4000 + n,
+      photo: TINY_JPEG_B64,
+    }),
+  });
+}
+
+function postTicket(base, id, netLb) {
+  return fetch(`${base}/api/records/${id}/ticket`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photo: TINY_JPEG_B64, netLb, facility: 'Parallel Transfer', weighedAt: new Date().toISOString() }),
+  });
+}
+
+// Round 3: the production index was rewritten from seed under two devices writing seconds
+// apart. Six creates at once, then six ticket attaches at once on six different records;
+// every one of the twelve writes must be visible afterwards, and each record must be
+// readable by id the moment its POST returns. Runs against both backends (`label`).
+async function testConcurrency(base, label) {
+  const postResults = await Promise.all([1, 2, 3, 4, 5, 6].map((n) => postRecord(base, n)));
+  ok(postResults.every((r) => r.status === 201), `${label}: 6 parallel POST /api/records all return 201 (got ${postResults.map((r) => r.status).join(',')})`);
+  const created = await Promise.all(postResults.map((r) => r.json()));
+  const ids = created.map((c) => c.id);
+  ok(new Set(ids).size === 6, `${label}: 6 parallel creates got 6 distinct ids`);
+
+  const byId = await Promise.all(ids.map((id) => fetch(`${base}/api/records/${id}`)));
+  ok(byId.every((r) => r.status === 200), `${label}: every record is readable by id immediately after create (got ${byId.map((r) => r.status).join(',')})`);
+  const byIdData = await Promise.all(byId.map((r) => r.json()));
+  ok(byIdData.every((r, i) => r.id === ids[i] && r.ticket === null), `${label}: read-by-id after create returns the record with ticket null`);
+
+  const ticketResults = await Promise.all(ids.map((id, i) => postTicket(base, id, 3000 + i)));
+  ok(ticketResults.every((r) => r.status === 200), `${label}: 6 parallel ticket POSTs on 6 records all return 200 (got ${ticketResults.map((r) => r.status).join(',')})`);
+
+  const listRes = await fetch(`${base}/api/records`);
+  const listData = await listRes.json();
+  const found = ids.map((id) => listData.records.find((r) => r.id === id));
+  ok(found.every(Boolean), `${label}: all 6 created records are present in the list`);
+  ok(found.every((r) => r && r.ticket && typeof r.ticket.netLb === 'number'), `${label}: all 6 tickets are present in the list (12 of 12 writes survived)`);
+  ok(new Set(listData.records.map((r) => r.id)).size === listData.records.length, `${label}: list has no duplicate ids`);
+  return ids;
+}
+
 // Round-1 checker findings 1+2: a legacy (pre-ticket-feature) index is a bare shape with no
 // `pricing`/`ticket` on real records, and some real records may predate the `seed` flag
 // entirely. Spins up its own dev.js against a data dir seeded with a hand-written legacy
@@ -153,6 +204,237 @@ async function testMigration() {
   } finally {
     child.kill();
     await fs.rm(migDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+// ---- Blob code path, against the in-memory fake in test/fake-blob.js ----
+// dev.js is imported into this process once (it listens on PORT at import) so the client
+// injected into lib/store.js is the one the handlers use. Re-injecting a fake clears the
+// store's per-instance caches, which is how a cold start on a second instance is imitated
+// below (`coldStart`). What the fake does not model is listed at the top of fake-blob.js.
+async function testBlobBackend() {
+  const store = await import('../lib/store.js');
+  const { createFakeBlob } = await import('./fake-blob.js');
+  const port = await getFreePort();
+  const base = `http://localhost:${port}`;
+  process.env.PORT = String(port);
+  await import('../dev.js');
+
+  const SEED_KEY = 'collected/seed-v2.json';
+  const seedPuts = (fake) => fake.puts.filter((p) => p.pathname === SEED_KEY);
+  const coldStart = (fake) => store._setBlobClientForTests(fake);
+
+  try {
+    // A. fresh store: seed written exactly once, then the concurrency test, then a ticket on
+    //    a seed record. pageSize 4 makes the records/ listing paginate.
+    {
+      const fake = createFakeBlob({ pageSize: 4 });
+      coldStart(fake);
+      await waitForServer(base);
+      const first = await fetch(`${base}/api/records`);
+      ok(first.status === 200, `blob: first GET /api/records on an empty store returns 200 (got ${first.status})`);
+      const firstData = await first.json();
+      ok(firstData.records.length >= 100, `blob: empty store is seeded (${firstData.records.length} records)`);
+      ok(fake.keys().length === 1 && fake.keys()[0] === SEED_KEY, `blob: the only blob after seeding is ${SEED_KEY} (got ${fake.keys().join(',')})`);
+      ok(seedPuts(fake).length === 1 && seedPuts(fake)[0].options.allowOverwrite === false, 'blob: seed is written once, with allowOverwrite: false');
+      ok(seedPuts(fake)[0].options.cacheControlMaxAge === 60, `blob: seed put sets cacheControlMaxAge 60 (got ${seedPuts(fake)[0].options.cacheControlMaxAge})`);
+      await fetch(`${base}/api/records`);
+      ok(seedPuts(fake).length === 1, 'blob: second GET does not rewrite the seed');
+      coldStart(fake);
+      await fetch(`${base}/api/records`);
+      ok(seedPuts(fake).length === 1, 'blob: a cold start on a store with a seed does not rewrite it');
+
+      const ids = await testConcurrency(base, 'blob');
+      ok(fake.keys('collected/records/').length === 6, `blob: six records/ blobs after six creates+tickets (got ${fake.keys('collected/records/').length})`);
+      ok(fake.keys('collected/photos/').length === 6 && fake.keys('collected/tickets/').length === 6, 'blob: six photo blobs and six ticket blobs');
+      ok(fake.keys('collected/index-').length === 0, 'blob: no index-*.json is ever written');
+      const recPuts = fake.puts.filter((p) => p.pathname.startsWith('collected/records/'));
+      ok(recPuts.every((p) => p.options.allowOverwrite === true && p.options.addRandomSuffix === false && p.options.cacheControlMaxAge === 60), 'blob: every records/ put uses addRandomSuffix:false, allowOverwrite:true, cacheControlMaxAge 60');
+      ok(recPuts.length === 12, `blob: 12 records/ puts for 6 creates + 6 tickets (got ${recPuts.length})`);
+
+      // Read-by-id from a cold instance: nothing in memory, so this is the deterministic-URL fetch.
+      coldStart(fake);
+      const coldRead = await fetch(`${base}/api/records/${ids[0]}`);
+      const coldData = await coldRead.json();
+      ok(coldRead.status === 200 && coldData.ticket && coldData.ticket.netLb === 3000, `blob: cold instance reads a ticketed record by its deterministic URL (got ${coldRead.status})`);
+      ok(fake.puts.length === 25, `blob: the cold read wrote nothing (1 seed + 6 photos + 6 tickets + 12 records = 25 puts, got ${fake.puts.length})`);
+
+      // A ticket on a seed record: the seed blob is untouched; the record gets its own
+      // records/ override with seed: true kept, and the list shows it once, with the ticket.
+      const seedRec = firstData.records.find((r) => r.seed === true && r.status === 'collected' && !r.ticket);
+      const seedTicket = await postTicket(base, seedRec.id, 4100);
+      ok(seedTicket.status === 200, `blob: ticket on a seed record returns 200 (got ${seedTicket.status})`);
+      const override = fake.readJson(`collected/records/${seedRec.id}.json`);
+      ok(!!override && override.seed === true && override.ticket && override.ticket.netLb === 4100, 'blob: seed record with a ticket gets records/<id>.json with seed:true kept and the ticket');
+      ok(seedPuts(fake).length === 1, 'blob: attaching a ticket to a seed record does not rewrite the seed');
+      coldStart(fake);
+      const afterList = await (await fetch(`${base}/api/records`)).json();
+      const seedRows = afterList.records.filter((r) => r.id === seedRec.id);
+      ok(seedRows.length === 1 && seedRows[0].ticket && seedRows[0].ticket.netLb === 4100, 'blob: cold list shows the ticketed seed record exactly once, override winning over the seed row');
+      const second = await postTicket(base, seedRec.id, 4200);
+      ok(second.status === 409, `blob: second ticket on the same record from a cold instance returns 409 (got ${second.status})`);
+      const unknown = await fetch(`${base}/api/records/nope`);
+      ok(unknown.status === 404, `blob: GET /api/records/nope returns 404 (got ${unknown.status})`);
+    }
+
+    // B. reseed on error is impossible. B1: list() throws on an empty store. B2: list works
+    //    but the seed body cannot be fetched. B3: no seed listed, base known from another
+    //    blob, the direct check 5xxs. All three: 503 and not one put.
+    {
+      const fake = createFakeBlob();
+      fake.fail.list = true;
+      coldStart(fake);
+      const r1 = await fetch(`${base}/api/records`);
+      ok(r1.status === 503, `blob B1: GET /api/records with list() failing returns 503 (got ${r1.status})`);
+      const r1b = await fetch(`${base}/api/records/260812-nycx`);
+      ok(r1b.status === 503, `blob B1: GET /api/records/:id with list() failing returns 503 (got ${r1b.status})`);
+      const r1c = await postRecord(base, 9);
+      ok(r1c.status === 503, `blob B1: POST /api/records with list() failing returns 503 (got ${r1c.status})`);
+      ok(fake.puts.length === 0 && fake.keys().length === 0, 'blob B1: nothing was written while storage was failing');
+      fake.fail.list = false;
+      const r1d = await fetch(`${base}/api/records`);
+      ok(r1d.status === 200 && seedPuts(fake).length === 1, `blob B1: once list() recovers the next request seeds normally (got ${r1d.status}, seed puts ${seedPuts(fake).length})`);
+    }
+    {
+      const fake = createFakeBlob();
+      fake.seed(SEED_KEY, { seedVersion: 2, records: [{ id: 'seed-x', address: 'x', status: 'collected', capturedAt: '2026-09-01T00:00:00.000Z', seed: true }] });
+      fake.fail.fetch = true;
+      coldStart(fake);
+      const r2 = await fetch(`${base}/api/records`);
+      ok(r2.status === 503, `blob B2: seed listed but unreadable (fetch 5xx) returns 503 (got ${r2.status})`);
+      ok(fake.puts.length === 0, 'blob B2: an unreadable seed is never rewritten');
+      fake.fail.fetch = false;
+      const r2b = await (await fetch(`${base}/api/records`)).json();
+      ok(r2b.records.length === 1 && r2b.records[0].id === 'seed-x' && fake.puts.length === 0, 'blob B2: after the fetch recovers the existing seed is served, still with no writes');
+    }
+    {
+      const fake = createFakeBlob();
+      fake.seed('collected/photos/only-a-photo.jpg', Buffer.from(TINY_JPEG_B64, 'base64'), { contentType: 'image/jpeg' });
+      fake.fail.fetch = true;
+      coldStart(fake);
+      const r3 = await fetch(`${base}/api/records`);
+      ok(r3.status === 503, `blob B3: no seed listed, direct fetch 5xx: returns 503 (got ${r3.status})`);
+      ok(fake.puts.length === 0, 'blob B3: a failed direct check never writes a seed');
+    }
+
+    // D. BLOB_BASE_URL: list() lags (seed hidden from it) but the direct fetch of the
+    //    deterministic URL finds the seed, so no duplicate seed write happens.
+    {
+      const fake = createFakeBlob();
+      fake.seed(SEED_KEY, { seedVersion: 2, records: [{ id: 'seed-y', address: 'y', status: 'collected', capturedAt: '2026-09-01T00:00:00.000Z', seed: true }] });
+      fake.hiddenFromList.add(SEED_KEY);
+      process.env.BLOB_BASE_URL = fake.base;
+      try {
+        coldStart(fake);
+        const rd = await (await fetch(`${base}/api/records`)).json();
+        ok(rd.records.length === 1 && rd.records[0].id === 'seed-y', 'blob D: seed hidden from list() but found by direct URL via BLOB_BASE_URL is served');
+        ok(fake.puts.length === 0, 'blob D: the direct-URL check prevents a duplicate seed write when list() lags');
+      } finally {
+        delete process.env.BLOB_BASE_URL;
+      }
+    }
+
+    // C. migration off the index-file design, plus orphan photo recovery.
+    {
+      const fake = createFakeBlob();
+      const idxOld = { seedVersion: 2, records: [
+        { id: '260910-old1', address: 'Only in the older index', status: 'collected', capturedAt: '2026-09-10T10:00:00.000Z', photoUrl: `${fake.base}/collected/photos/260910-old1.jpg`, seed: false },
+      ] };
+      const idxNew = { seedVersion: 2, records: [
+        { id: '260911-seed', address: 'Seed row in index', status: 'collected', capturedAt: '2026-09-11T10:00:00.000Z', photoUrl: '/api/photo/260911-seed.svg', seed: true },
+        { id: '260916-real', address: '5 Real Capture Rd', container: 'RO-30-5', status: 'collected', capturedAt: '2026-09-16T21:00:00.000Z', receivedAt: '2026-09-16T21:00:01.000Z', gps: null, photoUrl: `${fake.base}/collected/photos/260916-real.jpg`, captureMs: 7000, seed: false },
+        { id: '260915-nofl', address: '6 Pre-flag Capture Rd', status: 'collected', capturedAt: '2026-09-15T21:00:00.000Z', photoUrl: `${fake.base}/collected/photos/260915-nofl.jpg` },
+        // seed row that got a REAL ticket under the old design: copied as an override
+        { id: '260812-nycx', address: '1428 Mission College Blvd', status: 'collected', capturedAt: '2026-08-12T15:00:00.000Z', photoUrl: '/api/photo/260812-nycx.svg', seed: true, ticket: { photoUrl: `${fake.base}/collected/tickets/260812-nycx.jpg`, netLb: 6100 } },
+        // seed row with a seed-generated svg ticket: not real, not copied
+        { id: '260901-sgen', address: 'Seed with generated ticket', status: 'collected', capturedAt: '2026-09-01T15:00:00.000Z', photoUrl: '/api/photo/260901-sgen.svg', seed: true, ticket: { photoUrl: '/api/ticket/260901-sgen.svg', netLb: 2500 } },
+      ] };
+      fake.seed('collected/index-1758145200000.json', idxOld);
+      fake.seed('collected/index-1758146436000.json', idxNew);
+      // A newer index that list() still shows but that was deleted (fetch 404): skipped, not fatal.
+      fake.seed('collected/index-1758146500000.json', { seedVersion: 2, records: [{ id: '260916-gone', address: 'in a deleted index', status: 'collected', capturedAt: '2026-09-16T22:00:00.000Z', seed: false }] });
+      fake.hiddenFromFetch.add('collected/index-1758146500000.json');
+      const jpg = Buffer.from(TINY_JPEG_B64, 'base64');
+      fake.seed('collected/photos/260916-real.jpg', jpg, { contentType: 'image/jpeg' });
+      fake.seed('collected/photos/260915-nofl.jpg', jpg, { contentType: 'image/jpeg' });
+      fake.seed('collected/tickets/260916-real.jpg', jpg, { contentType: 'image/jpeg' });
+      const orphanAt = new Date('2026-09-16T22:01:12.000Z');
+      fake.seed('collected/photos/260916-orph.jpg', jpg, { contentType: 'image/jpeg', uploadedAt: orphanAt });
+      coldStart(fake);
+
+      const mig = await fetch(`${base}/api/records`);
+      ok(mig.status === 200, `blob C: first request on a store with index files returns 200 (got ${mig.status})`);
+      const migData = await mig.json();
+
+      const real = fake.readJson('collected/records/260916-real.json');
+      ok(!!real && real.seed === false && real.address === '5 Real Capture Rd', 'blob C: seed:false record from the newest index is copied to records/<id>.json');
+      ok(!!real && real.pricing && real.pricing.includedLb === 2000 && real.ticket === null, 'blob C: migrated record is backfilled with pricing/ticket');
+      const nofl = fake.readJson('collected/records/260915-nofl.json');
+      ok(!!nofl && nofl.address === '6 Pre-flag Capture Rd', 'blob C: record with no seed key at all is migrated too (predicate is seed !== true)');
+      ok(fake.readJson('collected/records/260911-seed.json') === null, 'blob C: seed:true row in the index is not copied');
+      const seedOverride = fake.readJson('collected/records/260812-nycx.json');
+      ok(!!seedOverride && seedOverride.seed === true && seedOverride.ticket && seedOverride.ticket.netLb === 6100, 'blob C: seed row with a real (blob) ticket is copied as an override with seed:true kept');
+      ok(fake.readJson('collected/records/260901-sgen.json') === null, 'blob C: seed row with a seed-generated svg ticket is not copied');
+      const nycxRows = migData.records.filter((r) => r.id === '260812-nycx');
+      ok(nycxRows.length === 1 && nycxRows[0].ticket && nycxRows[0].ticket.netLb === 6100, 'blob C: list shows the pinned seed record once, with the migrated real ticket winning');
+      ok(fake.readJson('collected/records/260910-old1.json') === null, 'blob C: only the newest index is migrated (older index row not copied)');
+      ok(fake.keys('collected/index-').length === 3, 'blob C: index files are left in place');
+      ok(fake.readJson('collected/records/260916-gone.json') === null, 'blob C: a listed-but-deleted newer index is skipped and the next newest is used');
+      const migPuts = fake.puts.filter((p) => p.pathname.startsWith('collected/records/'));
+      ok(migPuts.every((p) => p.options.allowOverwrite === false), 'blob C: migration writes refuse to overwrite');
+
+      const orph = fake.readJson('collected/records/260916-orph.json');
+      const wantOrph = { id: '260916-orph', address: 'Unknown — recovered from photo', status: 'collected', capturedAt: orphanAt.toISOString(), photoUrl: `${fake.base}/collected/photos/260916-orph.jpg`, seed: false, recovered: true };
+      ok(JSON.stringify(orph) === JSON.stringify(wantOrph), `blob C: orphan photo becomes exactly the minimal recovered record (got ${JSON.stringify(orph)})`);
+      ok(fake.readJson('collected/records/260916-real.json').recovered === undefined, 'blob C: a photo whose record was migrated is not also recovered');
+
+      const ids = migData.records.map((r) => r.id);
+      ok(ids.includes('260916-real') && ids.includes('260915-nofl') && ids.includes('260916-orph') && !ids.includes('260911-seed') && !ids.includes('260910-old1'), 'blob C: list shows migrated + recovered records and the generated seed');
+      ok(migData.records[0].id === '260916-orph' || new Date(migData.records[0].capturedAt) >= orphanAt, 'blob C: list is newest first');
+      const byId = await fetch(`${base}/api/records/260916-orph`);
+      ok(byId.status === 200 && (await byId.json()).recovered === true, `blob C: recovered record is readable by id (got ${byId.status})`);
+
+      const putsBefore = fake.puts.length;
+      await fetch(`${base}/api/records`);
+      ok(fake.puts.length === putsBefore, 'blob C: migration runs once per instance (second request writes nothing)');
+      coldStart(fake);
+      await fetch(`${base}/api/records`);
+      ok(fake.puts.length === putsBefore, 'blob C: a cold start re-checks and finds nothing left to migrate');
+
+      // An orphaned ticket JPEG (the index lost the ticket fields, the photo survived) is
+      // left alone by the migration, and re-attaching a ticket to that record is refused
+      // (503) because ticket photos are never overwritten. Pinned here so the limitation is
+      // visible: production has two such JPEGs tonight and they need a decision, not a
+      // silent overwrite.
+      ok(fake.readJson('collected/records/260916-real.json').ticket === null, 'blob C: an orphaned ticket JPEG does not invent ticket fields on the record');
+      const reattach = await postTicket(base, '260916-real', 5100);
+      ok(reattach.status === 503, `blob C: re-attaching a ticket where tickets/<id>.jpg already exists is refused with 503, not overwritten (got ${reattach.status})`);
+      ok(fake.readJson('collected/records/260916-real.json').ticket === null, 'blob C: the refused re-attach wrote nothing to the record');
+
+      // No-clobber: attach a ticket to a migrated record, then hide its records/ blob from
+      // list() and fetch() (lag) and cold start. The migration must not overwrite it.
+      const t = await postTicket(base, '260915-nofl', 5200);
+      ok(t.status === 200, `blob C: ticket on a migrated record returns 200 (got ${t.status})`);
+      fake.hiddenFromList.add('collected/records/260915-nofl.json');
+      fake.hiddenFromFetch.add('collected/records/260915-nofl.json');
+      coldStart(fake);
+      const lag = await fetch(`${base}/api/records`);
+      ok(lag.status === 200, `blob C: request during list()/fetch lag still returns 200 (got ${lag.status})`);
+      fake.hiddenFromList.delete('collected/records/260915-nofl.json');
+      fake.hiddenFromFetch.delete('collected/records/260915-nofl.json');
+      const kept = fake.readJson('collected/records/260915-nofl.json');
+      ok(!!kept && kept.ticket && kept.ticket.netLb === 5200, 'blob C: migration under lag did not clobber the ticketed record (allowOverwrite:false backstop)');
+      const refused = fake.puts.filter((p) => p.pathname === 'collected/records/260915-nofl.json' && p.ok === false);
+      ok(refused.length === 1, `blob C: exactly one refused overwrite attempt was made and swallowed (got ${refused.length})`);
+      coldStart(fake);
+      const finalRead = await (await fetch(`${base}/api/records/260915-nofl`)).json();
+      ok(finalRead.ticket && finalRead.ticket.netLb === 5200, 'blob C: after lag clears the ticketed record reads back intact');
+    }
+  } catch (err) {
+    failures += 1;
+    console.log(`  FAIL - blob backend test crashed: ${err && err.stack}`);
+  } finally {
+    store._setBlobClientForTests(null);
   }
 }
 
@@ -387,12 +669,22 @@ async function main() {
       body: JSON.stringify({ photo: TINY_JPEG_B64, netLb: 4500 }),
     });
     ok(unknownTicketRes.status === 404, `POST /api/records/nope/ticket returns 404 (got ${unknownTicketRes.status})`);
+
+    // 17. no-store on every GET
+    for (const p of ['/api/records', `/api/records/${freshRecord.id}`, `/api/photo/${seedRecord.id}.svg`, `/api/ticket/${freshRecord.id}.jpg`, '/api/schedule']) {
+      const r = await fetch(`${base}${p}`);
+      ok(r.headers.get('cache-control') === 'no-store', `GET ${p} sends Cache-Control: no-store (got ${r.headers.get('cache-control')})`);
+    }
+
+    // 18. concurrency on the local backend (single process, single file, lock in store.js)
+    await testConcurrency(base, 'local');
   } finally {
     child.kill();
     await fs.rm(dataDir, { recursive: true, force: true }).catch(() => {});
   }
 
   await testMigration();
+  await testBlobBackend();
 
   console.log('');
   if (failures > 0) {

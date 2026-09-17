@@ -1,8 +1,19 @@
-// GET /api/records/:id -> the record, or 404 { error }.
+// GET /api/records/:id -> the record, or 404 { error }. 503 when storage cannot be read.
 import { getRecord, ensureSeeded } from '../../lib/store.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  try {
+    await handle(req, res);
+  } catch (err) {
+    console.error('storage error:', err);
+    res.statusCode = 503;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'storage unavailable', detail: String(err && err.message) }));
+  }
+}
+
+async function handle(req, res) {
   await ensureSeeded();
 
   if (req.method !== 'GET') {

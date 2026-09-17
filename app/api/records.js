@@ -1,5 +1,6 @@
 // GET /api/records -> { records: [...] } newest first, no photo bytes beyond photoUrl.
 // POST /api/records -> { id, url } 201, or 400 on validation failure.
+// 503 { error } when storage cannot be read or written; nothing is reseeded on the way.
 import { listRecords, putRecord, ensureSeeded } from '../lib/store.js';
 import { makeId } from '../lib/ids.js';
 
@@ -28,6 +29,15 @@ function sendJson(res, code, obj) {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  try {
+    await handle(req, res);
+  } catch (err) {
+    console.error('storage error:', err);
+    sendJson(res, 503, { error: 'storage unavailable', detail: String(err && err.message) });
+  }
+}
+
+async function handle(req, res) {
   await ensureSeeded();
 
   if (req.method === 'GET') {

@@ -1,6 +1,6 @@
 // POST /api/records/:id/ticket -> attach a scale ticket to an existing record.
 // 200 { id, url: "/p/<id>" } · 404 unknown id · 400 missing/invalid photo or netLb ·
-// 409 ticket already present.
+// 409 ticket already present · 503 storage cannot be read or written.
 import { getRecord, putTicket, ensureSeeded } from '../../../lib/store.js';
 
 async function readBody(req) {
@@ -22,6 +22,15 @@ function sendJson(res, code, obj) {
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  try {
+    await handle(req, res);
+  } catch (err) {
+    console.error('storage error:', err);
+    sendJson(res, 503, { error: 'storage unavailable', detail: String(err && err.message) });
+  }
+}
+
+async function handle(req, res) {
   await ensureSeeded();
 
   if (req.method !== 'POST') {

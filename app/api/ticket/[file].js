@@ -8,6 +8,20 @@ import { renderTicketSvg } from '../../lib/svgticket.js';
 const DATA_DIR = process.env.COLLECTED_DATA_DIR || path.join(process.cwd(), '.data');
 
 export default async function handler(req, res) {
+  // Round 3: every GET is no-store, images included. A record can be overwritten (ticket
+  // attach, migration), so nothing rendered from one is allowed to outlive it in a cache.
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    await handle(req, res);
+  } catch (err) {
+    console.error('storage error:', err);
+    res.statusCode = 503;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'storage unavailable', detail: String(err && err.message) }));
+  }
+}
+
+async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   const parts = url.pathname.split('/').filter(Boolean); // ['api','ticket', file]
   const file = decodeURIComponent(parts[2] || url.searchParams.get('file') || req.query?.file || '');
@@ -26,7 +40,6 @@ export default async function handler(req, res) {
     const svg = renderTicketSvg(record);
     res.statusCode = 200;
     res.setHeader('Content-Type', 'image/svg+xml');
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.end(svg);
     return;
   }
@@ -42,8 +55,7 @@ export default async function handler(req, res) {
       const buf = await fs.readFile(path.join(DATA_DIR, 'tickets', `${id}.jpg`));
       res.statusCode = 200;
       res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      res.end(buf);
+        res.end(buf);
     } catch {
       res.statusCode = 404;
       res.setHeader('Content-Type', 'application/json');
