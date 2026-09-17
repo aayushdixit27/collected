@@ -24,6 +24,7 @@
       <span class="rec-id mono" id="ddId"></span>
     </div>
 
+    <div class="section-label first">Pickup</div>
     <img id="photo" class="photo-full" alt="Service event photo">
 
     <table class="record-table">
@@ -55,15 +56,30 @@
           <th>Note</th>
           <td id="ddNote"></td>
         </tr>
+      </tbody>
+    </table>
+
+    <div id="map" class="hidden"></div>
+    <a id="gmapsLink" target="_blank" rel="noopener" class="gmaps-link hidden">Open in Google Maps</a>
+
+    <div id="ticketSection">
+      <div class="section-label">Scale ticket</div>
+      <div id="ticketBody"></div>
+    </div>
+
+    <div id="chargeSection" class="hidden">
+      <div class="section-label">Charge</div>
+      <div id="chargeBody"></div>
+    </div>
+
+    <table class="record-table">
+      <tbody>
         <tr>
           <th>Received by server</th>
           <td class="mono" id="ddReceived"></td>
         </tr>
       </tbody>
     </table>
-
-    <div id="map" class="hidden"></div>
-    <a id="gmapsLink" target="_blank" rel="noopener" class="gmaps-link hidden">Open in Google Maps</a>
 
     <div class="proof-actions no-print">
       <button type="button" id="copyLinkBtn" class="btn-plain">Copy link</button>
