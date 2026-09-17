@@ -11,6 +11,10 @@
 
   const params = new URLSearchParams(location.search);
   const t0 = params.get('t0');
+  const t0Valid = !!(t0 && /^\d+$/.test(t0) && (() => {
+    const ms = Date.now() - Number(t0);
+    return ms >= 0 && ms <= 3600000;
+  })());
 
   const STATUS_LABEL = {
     collected: 'Collected',
@@ -32,6 +36,116 @@
       hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
     };
     return new Intl.DateTimeFormat(undefined, opts).format(d);
+  }
+
+  // Overage helper — duplicated locally per MISSION.md; do not import from lib/ (server-side).
+  function overage(netLb, includedLb, ratePerTon) {
+    const overLb = Math.max(0, netLb - includedLb);
+    const charge = Math.round((overLb / 2000) * ratePerTon * 100) / 100;
+    return { overLb, charge };
+  }
+
+  function esc(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function fmtLb(n) {
+    return Number.isFinite(n) ? `${n.toLocaleString('en-US')} lb` : '—';
+  }
+
+  function fmtMoney(n) {
+    return Number.isFinite(n)
+      ? '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : '—';
+  }
+
+  function renderTicketAndCharge(record) {
+    const ticketSection = el('ticketSection');
+    const ticketBody = el('ticketBody');
+    const chargeSection = el('chargeSection');
+    const chargeBody = el('chargeBody');
+    const ticket = record.ticket;
+
+    if (!ticket) {
+      const pulled = record.status === 'collected' || record.status === 'removed';
+      if (pulled) {
+        ticketSection.classList.remove('hidden');
+        ticketBody.innerHTML = `
+          <table class="record-table"><tbody>
+            <tr><th></th><td style="color:var(--warn)">No scale ticket tied to this pull.</td></tr>
+          </tbody></table>`;
+      } else {
+        ticketSection.classList.add('hidden');
+        ticketBody.innerHTML = '';
+      }
+      chargeSection.classList.add('hidden');
+      chargeBody.innerHTML = '';
+      return;
+    }
+
+    ticketSection.classList.remove('hidden');
+
+    const weighedMs = Date.parse(ticket.weighedAt);
+    const capturedMs = Date.parse(record.capturedAt);
+    const weighedLocal = Number.isFinite(weighedMs) ? fmtCaptured(ticket.weighedAt) : '—';
+    let deltaLine = '';
+    if (Number.isFinite(weighedMs) && Number.isFinite(capturedMs)) {
+      const deltaMin = Math.round((weighedMs - capturedMs) / 60000);
+      deltaLine = deltaMin < 0
+        ? `<span class="weighed-delta warn">${deltaMin} min before pickup</span>`
+        : `<span class="weighed-delta">+${deltaMin} min after pickup</span>`;
+    }
+
+    const tareCell = ticket.tareLb == null
+      ? `<td style="color:var(--ink-2)">— not on ticket</td>`
+      : `<td class="num">${fmtLb(ticket.tareLb)}</td>`;
+    const grossCell = ticket.grossLb == null ? `<td>—</td>` : `<td class="num">${fmtLb(ticket.grossLb)}</td>`;
+
+    let locationRow = '';
+    if (ticket.gps) {
+      locationRow = `<tr><th>Location</th><td class="mono">${ticket.gps.lat.toFixed(5)}, ${ticket.gps.lon.toFixed(5)} ± ${ticket.gps.accuracyM ?? '?'}m</td></tr>`;
+    }
+
+    ticketBody.innerHTML = `
+      <img class="photo-ticket" src='${esc(ticket.photoUrl)}' alt="Scale ticket">
+      <table class="record-table"><tbody>
+        <tr><th>Facility</th><td>${esc(ticket.facility) || '—'}</td></tr>
+        <tr><th>Weighed</th><td>${weighedLocal}${deltaLine}</td></tr>
+        <tr><th>Gross</th>${grossCell}</tr>
+        <tr><th>Tare</th>${tareCell}</tr>
+        <tr><th>Net</th><td class="num">${fmtLb(ticket.netLb)}</td></tr>
+        ${locationRow}
+      </tbody></table>`;
+
+    if (!Number.isFinite(ticket.netLb)) {
+      chargeSection.classList.add('hidden');
+      chargeBody.innerHTML = '';
+      return;
+    }
+
+    let pricing = record.pricing;
+    if (!pricing) {
+      pricing = { includedLb: 2000, ratePerTon: 95 };
+    }
+    const { overLb, charge } = overage(ticket.netLb, pricing.includedLb, pricing.ratePerTon);
+
+    const amountLine = overLb === 0
+      ? `<div class="charge-amount">${fmtMoney(charge)}<small>— within the included ton</small></div>`
+      : `<div class="charge-amount">${fmtMoney(charge)}<small>Overage at ${fmtMoney(pricing.ratePerTon)} per ton over the included ${fmtLb(pricing.includedLb)}</small></div>`;
+
+    chargeBody.innerHTML = `
+      <div class="charge">
+        <div class="charge-line"><span class="term">Net ${fmtLb(ticket.netLb)}</span> <span class="sep">·</span> <span class="term">Included ${fmtLb(pricing.includedLb)}</span> <span class="sep">·</span> <span class="term">Over ${fmtLb(overLb)}</span></div>
+        <div class="charge-formula">${fmtLb(overLb)} ÷ 2,000 × ${fmtMoney(pricing.ratePerTon)}/ton</div>
+        ${amountLine}
+      </div>`;
+    chargeSection.classList.remove('hidden');
   }
 
   async function load() {
@@ -64,7 +178,7 @@
     el('recordState').classList.remove('hidden');
 
     const photo = el('photo');
-    if (t0) {
+    if (t0Valid) {
       photo.addEventListener('load', () => {
         const ms = Date.now() - Number(t0);
         const badge = el('retrievedBadge');
@@ -84,7 +198,7 @@
     el('ddAddress').textContent = record.address;
     el('ddContainer').textContent = record.container || '—';
 
-    el('ddCaptured').innerHTML = `${fmtCaptured(record.capturedAt)}<span class="captured-iso mono">${record.capturedAt}</span>`;
+    el('ddCaptured').innerHTML = `${fmtCaptured(record.capturedAt)}<span class="captured-iso mono">${esc(record.capturedAt)}</span>`;
 
     if (record.gps) {
       el('locText').textContent = `${record.gps.lat.toFixed(5)}, ${record.gps.lon.toFixed(5)} ± ${record.gps.accuracyM ?? '?'}m`;
@@ -129,6 +243,8 @@
       setTimeout(() => (el('copyLinkBtn').textContent = 'Copy link'), 1500);
     });
     el('printBtn').addEventListener('click', () => window.print());
+
+    renderTicketAndCharge(record);
   }
 
   load();

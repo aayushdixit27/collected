@@ -552,14 +552,110 @@ table.record-table td.mono { font-family: var(--mono); }
 }
 .not-found a { text-decoration: underline; }
 
-@page { margin: 16mm; }
+/* -- proof sections (pickup / scale ticket / charge) -- */
+
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: var(--g24) 0 var(--g12);
+  padding-top: var(--g12);
+  border-top: 1px solid var(--rule);
+}
+.section-label.first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.photo-ticket {
+  display: block;
+  max-height: 400px;
+  width: auto;
+  max-width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin: 0 0 var(--g16);
+}
+
+table.record-table td.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.weighed-delta {
+  display: block;
+  font-size: 14px;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+.weighed-delta.warn { color: var(--warn); }
+
+.charge { max-width: 68ch; }
+.charge-line {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  padding: var(--g8) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.charge-line .sep { color: var(--ink-2); margin: 0 var(--g8); }
+.charge-line .term { white-space: nowrap; }
+
+#ddReceived { font-size: 14px; white-space: nowrap; }
+.charge-formula {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--ink-2);
+  padding: var(--g8) 0;
+}
+.charge-amount {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1;
+  padding: var(--g8) 0 var(--g16);
+}
+.charge-amount small {
+  display: block;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink-2);
+  margin-top: 4px;
+}
+
+@page { size: Letter; margin: 12mm; }
 
 @media print {
   * { color: #111 !important; background: #fff !important; }
-  body { background: #fff; }
-  .proof-wrap { max-width: none; padding: 0 16mm; }
+  body { background: #fff; font-size: 11pt; line-height: 1.25; }
+  .proof-wrap { max-width: none; padding: 0; }
   .no-print, #map, .gmaps-link, .retrieved-badge, .proof-actions { display: none !important; }
-  .photo-full { max-height: 55vh; width: auto; object-fit: contain; }
+  .proof-title-row { padding-bottom: 4px; margin-bottom: 6px; }
+  .proof-title-row h1 { font-size: 16px; }
+  .photo-full { max-height: 30vh; width: auto; object-fit: contain; margin-bottom: 6px; }
+  .photo-ticket {
+    float: right;
+    width: 45mm;
+    max-height: none;
+    margin: 0 0 4px 6px;
+    border-width: 1px;
+  }
+  .section-label { margin: 6px 0 4px; padding-top: 4px; font-size: 10px; }
+  .section-label.first { margin-top: 0; padding-top: 0; }
+  table.record-table { margin-bottom: 4px; font-size: 10pt; }
+  table.record-table th, table.record-table td { padding: 2px 8px 2px 0; }
+  table.record-table th { font-size: 9pt; }
+  .captured-iso, .weighed-delta { font-size: 9pt; margin-top: 0; }
+  .charge-amount { font-size: 26px; padding: 2px 0 4px; }
+  .charge-line { padding: 2px 0; font-size: 10pt; }
+  .charge-formula { padding: 2px 0; font-size: 9pt; }
+  .footer-note { font-size: 9pt; margin: 4px 0 0; }
   table.record-table tr { border-bottom: 1px solid #999; }
 }
 
