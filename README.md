@@ -1,197 +1,203 @@
 # Collected
 
-**Proof that the truck came.**
+**The weight ticket, tied to your container.**
 
-A ten-second record of a waste-container service event — photo, timestamp, location,
-container, address — that can still be found weeks later, tied to the right job, when someone
-disputes it.
+The paper ticket a roll-off driver gets at a third-party transfer station, tied to the
+customer's container when it is issued, on one page with the pickup photo and the overage
+arithmetic — sent with the charge, not produced on request weeks later.
 
-🔗 **Live:** https://collected-nu.vercel.app · 🎥 **Demo:** _pending_
+🔗 **Live:** https://getcollected.vercel.app · 🎥 **Demo:** _pending_
 
 ---
 
 ## The finding
 
-The charge arrives three weeks late. You ask for proof. The proof doesn't prove anything.
+The charge arrives three weeks late. You ask for proof. The proof proves nothing.
 
-A customer, August 2026, verbatim:
-
-> *"I was charged first and had to call and email to get a copy of the weight ticket showing
-> an overage. The weight ticket provided did not have any identifying information that it
-> belonged to our reserved container. I cannot confirm it was actually our ticket."*
-
-Corroborated by another:
-
-> *"No tare weight for the truck and dumpster entering, no measured empty weight... All that
-> is listed is 'Inbound dirt by yard.'"*
+Public customer reviews of dumpster-rental companies, 2023 to 2026, describe the same
+sequence: an overage charge weeks after the pickup, a scale ticket produced on request, and
+nothing on it that says whose load it was — no container, no address, sometimes no tare. An
+earlier draft quoted two of those reviews; the quotes came out because I could not re-locate
+their sources, and go back in when I can.
 
 That is not "no record exists." **It is "the record exists and cannot be tied to me."** The
-customer states the addressability problem unprompted: a scale ticket with a weight on it and
-nothing that connects it to a container, an address, or a date.
-
-The pattern repeats across public customer reviews of several rental companies, 2023 to
-2026: overage charges appearing weeks after pickup, a ticket produced on request, and nothing
-on the ticket that identifies whose load it was.
+customer cannot check it, so the customer assumes the worst. Until the sources are recovered
+this is a hypothesis, presented as one.
 
 ## How the bill gets late
 
-The mechanism matters, because it explains why the obvious fixes miss.
+The mechanism explains why the obvious fixes miss.
 
 1. A customer rents a 20-yard at a flat rate that includes one ton.
 2. The driver pulls the full can and drives to the transfer station.
-3. The scale house weighs in gross, out tare, and issues a **paper ticket** with the net.
+3. The scale house weighs gross in, tare out, and prints a **paper ticket** with the net.
 4. Net, minus the included ton, times the per-ton rate, is the overage.
-5. That ticket now has to get from the truck cab to whoever does the billing.
+5. That ticket has to get from the cab to whoever does the billing.
 
-Step five is the whole problem. Today it travels by crumpled cab, by photo texted into a
-group chat, or by someone re-typing tickets into QuickBooks on a Friday. **The bill is late
-because the paper is slow**, and when the ticket finally reaches the customer it carries a
-weight and nothing else.
-
-The service event has nine parts — delivery, the fill period, pickup condition and access,
-transport, the scale, waste classification, ticket transfer, invoicing, dispute — and **only
-the scale produces a durable artifact**, and that artifact is not addressed to a job.
+Step five is the whole problem. Today it travels by crumpled cab, photo in a group chat, or
+re-typing on a Friday. **The bill is late because the paper is slow**, and when it reaches
+the customer it carries a weight and nothing else. Of the nine parts of a service event,
+**only the scale produces a durable artifact**, and it is addressed to nobody.
 
 ## The crux
 
-**Every expensive dispute in this industry is about an event nobody recorded, against the
-right container, when it happened.**
+**Every expensive dispute in this industry is about an event nobody recorded against the
+right container when it happened.**
 
 | The dispute | The unrecorded event |
 |---|---|
-| Overage charge | what it weighed, the tare, and *which container this ticket belongs to* |
+| Overage charge | **which container this ticket belongs to**, then the net and the tare |
 | Missed pickup | that the truck came, when, and what it found |
 | Trip charge | that access was blocked |
 | Contamination reclassification | what was in the container |
 
-The hauler does not lose because they were wrong. They lose because they cannot show they
-were right — and the customer cannot check, so the customer assumes the worst.
+The hauler does not lose because they were wrong; they lose because they cannot show they
+were right. **Every system treats a job as done when the truck leaves; the customer, when
+someone can show what happened.**
 
-**Every system in this industry treats a job as done when the truck leaves. The customer
-treats it as done when someone can show what happened.** Whatever you tell a system counts
-as finished is the highest-leverage line in it.
+## Where the line is
+
+TrashLab's driver-app page, read 17 September 2026, claims photos, timestamps and GPS "tied
+automatically to the right job and container" — their claim, unverified by me, and it makes
+the pickup record theirs. Their scale product serves operators who own a scale; a roll-off
+hauler dumping at someone else's transfer station still leaves with a paper ticket no system
+owns. What this adds is that third-party ticket, tied to the container when it is issued, and
+the customer's page with the arithmetic. Their page also lists "overweight loads" as a
+structured driver workflow; whether that covers a ticket photo is my first question for
+John.
 
 ## What it costs — with its limits stated
 
-Five customers across three companies pair a weight dispute with language about leaving. Read
-that carefully: it is **stated intent**, and most of them are one-time residential renters
-who were never coming back anyway.
+Five customers across three companies pair a weight dispute with language about leaving. It
+is **stated intent**, and most are one-time residential renters who were not coming back.
 
-**Exactly one case is a repeat commercial buyer actually moving volume:** a contractor with a
-couple hundred rentals behind him, who moved most of his business after one unresolved weight
-dispute. One contractor. That is the strongest evidence of consequence in the research, and it
-is n=1.
+Exactly one is a repeat buyer: one customer who, in the wording recorded in my provenance
+sheet, "switched to mainly using the other company I preferred" after an unresolved weight
+dispute. That is the strongest evidence of consequence in the research; it is n=1, and no
+dollar figure for lost business exists anywhere.
 
 ## What it does
 
-**The product is retrieval, not capture.**
+**The product is the ticket, tied; the pickup photo is the input.**
 
-Every driver already has a camera, and photos do get taken. So the record is not missing. **It
-is unaddressable** — sitting in a camera roll as `IMG_4471.jpg`, or in a text thread, with no
-container ID, no address, no date-to-job link. Same failure as the ticket.
-
-1. **Capture** — tap the stop, take the photo, save. Address, container, timestamp and GPS
-   are attached automatically. One screen, one hand, no login. If it takes longer than ten
-   seconds it produces nothing.
-2. **Proof page** — a stable link showing the photo, the timestamp, the pin, the container.
-   Send it to a customer with the charge. If the GPS fix is more than a kilometre from the
-   stop's scheduled location, the page says so rather than drawing a pin under the wrong
-   address.
-3. **Retrieval** — searchable by address and date. The half that does not exist today.
-
-One record, two readers: the customer who thinks you overcharged them, and the office that
-has to answer them.
+1. **Pickup** — tap the stop, take the photo, save. Address, container, timestamp and GPS
+   attach automatically; over ten seconds and it produces nothing. TrashLab's driver app
+   does this; it is here because the ticket needs a pull to land on.
+2. **Ticket** — at the scale, "awaiting a scale ticket" lists today's pulls without one. Tap
+   it, photograph the paper ticket, type the net weight, save. One photo, one number; where
+   and when it was weighed attach automatically.
+3. **Office** — search by address and date; every row says whether a ticket is tied; a
+   "Missing ticket" filter lists the pulls that would be billed on nothing.
+4. **Customer page** — one stable link: pickup photo → the ticket, gross / tare / net,
+   facility, minutes after pickup → the charge. On the pinned demo record: 5,340 lb net, less
+   2,000 lb included, is 3,340 lb over, at $95 a ton, **$158.65**. With no ticket tied, the
+   page says so in red instead of a number.
 
 ## How the problem was chosen
 
-The build took two hours. Deciding what to build took considerably longer, and that was the
-point.
+Building took an afternoon. Choosing what to build took far longer; that was the point.
 
 - **Everything is source-graded.** A finding counts if a hauler, a customer, or a regulator
-  produced it. A software company describing a problem it sells against is positioning, not
-  evidence, and is filed separately.
-- **A competing direction was run deliberately**, scoped outside waste entirely, so this one
-  had to win rather than be assumed.
+  produced it. A vendor describing a problem it sells against is positioning, not evidence,
+  and is filed apart.
+- **A competing direction was run**, outside waste entirely, so this one had to win rather
+  than be assumed.
 - **Everything the company already ships was ruled out first** — billing, dispatch, routing,
   CRM, the communication centre, the driver app, inventory, accounting integrations.
-- **Two framings were killed.** The first was this one, demoted on the belief that overage
-  disputes were rare. The second, a city-penalty appeal record, replaced it for a day and was
-  killed on 15 September when the source table was actually read: the penalties covered many
-  performance categories, the haulers involved already ran on-board proof-of-service
-  technology and paid anyway, and their business was route-based accounts, not temporary
-  roll-off. The customer quotes above were the best-evidenced thing left standing, so they
-  lead.
-- **A graveyard was kept**, so none of it comes back in six weeks wearing a different name.
+- **Three framings were killed.** The overage receipt, demoted on the belief that weight
+  disputes were rare. A record for haulers answering a city regulator's enforcement, dead on
+  15 September when the source table was actually opened: the figures spanned many
+  performance categories, those haulers already ran on-board proof-of-service technology,
+  and their business was route-based accounts, not roll-off. And the pickup photo itself,
+  killed on 17 September when TrashLab's driver-app page was read and what I had built sat
+  inside their claim. The ticket was what the customer accounts had been about all along.
+- **A graveyard was kept**, so none of it comes back wearing a different name.
 
 ## What was deliberately not built
 
-No accounts or auth · no scale hardware integration · no billing-system connection · no
-payments · no native app · no jurisdiction rules engine · **and not the missed-pickup trigger
-or the customer receipt view** — those are roadmap items, cut on purpose, not for lack of
-time.
+No OCR of the ticket · no scale-hardware integration · no billing-system or invoice send · no
+accounts or auth · no tamper evidence on the record · no editing a ticket once saved. All cut
+on purpose; the first and third are roadmap.
 
 ## How this gets measured
 
-One number, and it is an input rather than an outcome, because an outcome cannot be assigned
-to a single change.
+One number, an input, because an outcome cannot be assigned to a single change.
 
-> **Percentage of service events with a retrievable record.** Given only an address and a
-> date, can someone put a timestamped photo of that event on screen in under thirty seconds?
+> **Share of billed overages that go out with a ticket tied to the container.** Tied means
+> the customer's page shows the ticket, the container it was weighed against, when and where
+> it was weighed, and the arithmetic.
 
-It contains both failure modes. A photo never taken scores zero. A photo unindexed in a camera
-roll also scores zero.
+Zero when the ticket was never photographed; zero when it sits in a text thread. Inputs:
+ticket step under 20 s (one photo, one number); tickets tied per pull; the customer's page
+under 30 s from address and date. **Reported beside it, not steered:** disputes closed with
+evidence and refunds avoided, count and dollars.
 
-**It is computed in the product, not asserted.** The office view's stat strip, read from the
-live deployment on 15 September 2026: **91 % coverage (234 of 257 scheduled stops in the
-range have a record), 7.6 s median capture, 234 records.** Those are computed over seeded
-demo data, so they demonstrate the instrument, not a field result.
+**The office strip still shows the previous North Star** — share of scheduled stops with a
+record. It measured the pickup, which TrashLab measures itself; superseded, not wrong, and
+the ticket figure is the next build. Read from the live API on 17 September 2026: **91 %
+(242 of 265 scheduled stops on recorded days), 7.7 s median capture, 253 records** — seeded
+data plus two real captures, so the instrument, not a field result.
 
-Measured timings, honestly labelled:
+Timings, honestly labelled:
 
 | Run | Capture | Retrieve |
 |---|---|---|
-| Live URL, browser automation (a floor) — first UI | 4.2 s | 2.2 – 10.8 s |
-| Live URL, browser automation — redesigned UI | 2.5 s | 2.2 s |
-| Desktop Chrome, human-paced — first UI | 8.8 s | 12.8 s |
-| Real phone, first UI, two captures | **25.1 s, 25.5 s** | — |
-| Real phone, redesigned UI | *not yet measured* | — |
+| Browser automation, live URL, first UI (a floor) | 4.2 s | 2.2 – 10.8 s |
+| Browser automation, live URL, redesigned UI | 2.5 s | 2.2 s |
+| Desktop Chrome, human-paced, first UI | 8.8 s | 12.8 s |
+| Real phone, first UI, two captures | 25.1 s, 25.5 s | — |
+| Real phone, 17 Sep, pickup step, two captures | **22.7 s, 39.9 s** | — |
+| Ticket step, browser automation (lane 2's script, not a hand) | 0.1 s | — |
+| Ticket step, real phone | *not yet timed by a human* | — |
 
-The two phone numbers are real captures by someone using the screen for the first time, on
-the first version of the interface. They are over the target by a factor of two and a half,
-and they are the most important numbers on this page, because the entire product rests on
-whether a driver will do this forty times a day. The interface was redesigned in response
-(one screen state, one action, the stop pre-selected); whether that moved the phone number
-is not yet known. Not hidden.
+The phone numbers matter most, because the product rests on a driver doing this forty times
+a day, now twice per pull. The interface was redesigned after the first two; today's say it
+is still over ten. One live record today carries a ticket timer of 32.7 s, but I have not
+confirmed whose hand that was, so it stays out of the table.
 
-**The one thing this will not trade:** capture speed. If a new field improves the record but
-pushes capture past ten seconds, the field loses.
+**The one thing this will not trade:** capture speed. Pickup under ten seconds, ticket one
+photo and one number; a field that pushes either past its budget loses.
+
+## How it was built
+
+The spec (`Take-home/09-ticket-spec.md`: record model, API, seed, acceptance criteria, test
+plan, non-goals) was written before any code. Three Claude Code lanes then built from that
+one contract in parallel on separate worktrees — data and API, driver and office screens,
+customer page — each with an independent reviewer its work had to pass before merge. The
+merged diff went to a fresh-context review, which found five defects: three fixed before
+deploy, two logged below. 53 tests pass. Every commit is on `main`, so the sequence can be
+checked rather than believed.
 
 ## What this does not establish
 
-- **No hauler was interviewed.** This is public desk research — customer reviews, operator
-  reviews, franchise agreements. It is not customer validation and is not presented as any.
-  Getting a hauler on the phone is day one.
-- **Churn is stated intent from mostly one-time renters, and one contractor.** No dollar
-  figure for lost business exists in the research.
-- **Whether drivers will actually use it is unproven**, and the one phone measurement says
-  not yet at this speed.
-- **No willingness-to-pay figure** from any verified small operator.
-- Seed data is synthetic: fictional street numbers in six metros, labelled images.
+- **No hauler was interviewed.** This is public desk research, not customer validation. Day
+  one is a hauler on the phone: where do your drivers dump, and what does the ticket look like?
+- **The sources of the two customer accounts are unrecovered.** Until then the addressability
+  problem is a hypothesis.
+- **Whether a driver will do a second capture at the scale is unproven**; the phone numbers
+  say not yet at this speed.
+- **Whether roll-off haulers in TrashLab's base dump at third-party scales** — the premise —
+  is plausible and unverified.
+- **A write race is open.** Two tickets saved at the same instant can lose one; the store
+  says so in a comment.
+- **Seed ids were renumbered on migration.** Only the pinned link (`/p/260812-nycx`) is
+  stable.
+- **Everything seeded is synthetic and labelled**: fictional street numbers in six metros,
+  generated tickets with one six-name facility pool, no tare on about 30 % by design. No
+  synthetic ticket has been compared to a real one.
 
 ## Roadmap
 
-1. **Ticket-to-container link** — photograph the scale ticket at the transfer station against
-   the same container ID and job, so a weight ticket carries the identifying information the
-   customer above said was missing.
-2. **The customer receipt** — the proof link attached to the overage charge when it is issued,
-   not produced on request three weeks later.
-3. **Could-not-service notice** — the same record, sent to the customer the same day a stop is
-   blocked, overfilled or not out.
+1. **Ticket OCR** — read gross, tare, net and facility off the photo; the driver confirms one
+   number instead of typing it.
+2. **The charge goes out with the page** — the overage line on the invoice carries the link;
+   no office step.
+3. **Could-not-service notice** — the same record, sent the day a box is blocked, overfilled
+   or not out.
 
 ---
 
 *Built as a take-home. The brief was to build something I had always wanted to build; this
 isn't that, and I'd rather say so than pretend. It is what I found when I went looking for a
-problem worth two hours in an industry I don't come from — and it held my attention because
-the failure underneath it is a retrieval failure, which is the kind of problem I keep coming
-back to.*
+problem worth the hours in an industry I don't come from, and it held me because the failure
+underneath is an addressability failure, the kind I keep coming back to.*
