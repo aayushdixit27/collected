@@ -35,7 +35,7 @@
 
   function ticketSuffix(r) {
     if (r.ticket && typeof r.ticket.netLb === 'number') {
-      return ` · ticket ${r.ticket.netLb.toLocaleString()} lb`;
+      return ` <span class="has-ticket">· ticket ${r.ticket.netLb.toLocaleString()} lb</span>`;
     }
     if (r.status === 'collected' && r.container && r.container.startsWith('RO-')) {
       return ' <span class="no-ticket">· no ticket</span>';

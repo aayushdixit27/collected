@@ -52,6 +52,7 @@
     pricing: null,
     photoBlob: null,
     t0: null,
+    openedFrom: null, // 'capture' | 'confirm' — which view to restore on Back/Done
   };
 
   const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -147,7 +148,7 @@
       b.querySelector('.pi-meta').textContent = `${rest}${rest ? ' · ' : ''}${r.container} · picked up ${formatTime(r.capturedAt)}`;
       b.addEventListener('click', () => {
         awaitingDialog.close();
-        openTicketView(r);
+        openTicketView(r, 'capture');
       });
       awaitingList.appendChild(b);
     });
@@ -406,6 +407,23 @@
   }
   netLbInput.addEventListener('input', updateTicketSaveEnabled);
 
+  // Gross/tare are optional integers: strip anything non-numeric as it's typed, and only
+  // ever send a value that parses to an in-range integer — never NaN, never free text.
+  function digitsOnlyInput(input) {
+    input.addEventListener('input', () => {
+      const cleaned = input.value.replace(/[^0-9]/g, '');
+      if (cleaned !== input.value) input.value = cleaned;
+    });
+  }
+  digitsOnlyInput(grossInput);
+  digitsOnlyInput(tareInput);
+  function optionalWeight(v) {
+    const s = v.trim();
+    if (!/^[0-9]+$/.test(s)) return null;
+    const n = parseInt(s, 10);
+    return n >= 1 && n <= 80000 ? n : null;
+  }
+
   moreToggle.addEventListener('click', () => {
     const opening = moreBlock.classList.contains('hidden');
     moreBlock.classList.toggle('hidden');
@@ -417,9 +435,12 @@
     el('ticketDayLine').textContent = `${DAY_SHORT[now.getDay()]} ${now.getDate()} ${MONTH_SHORT[now.getMonth()]}`;
     const today = todaysStops();
     const stop = today.find((s) => s.address === record.address || (record.container && s.container === record.container));
-    el('ticketRoutePos').innerHTML = stop
-      ? `<b>Scale ticket</b> · stop ${stop.routeOrder} of ${today.length}`
-      : '<b>Scale ticket</b>';
+    const routePos = el('ticketRoutePos');
+    routePos.textContent = '';
+    const b = document.createElement('b');
+    b.textContent = 'Scale ticket';
+    routePos.appendChild(b);
+    if (stop) routePos.append(` · stop ${stop.routeOrder} of ${today.length}`);
     el('ticketPickedUp').textContent = record.capturedAt ? `picked up ${formatTime(record.capturedAt)}` : '';
     const parts = (record.address || '').split(',');
     el('ticketAddr').textContent = parts[0].trim();
@@ -450,11 +471,12 @@
     resetTicketCamera();
   }
 
-  function openTicketView(record) {
+  function openTicketView(record, openedFrom) {
     ticketState.recordId = record.id;
     ticketState.address = record.address;
     ticketState.container = record.container || null;
     ticketState.pricing = record.pricing || null;
+    ticketState.openedFrom = openedFrom === 'confirm' ? 'confirm' : 'capture';
     resetTicketForm();
     renderTicketHeader(record);
     captureView.classList.add('hidden');
@@ -463,6 +485,19 @@
     ticketFormWrap.classList.remove('hidden');
     ticketView.classList.remove('hidden');
   }
+
+  // Back leaves whichever view opened the ticket screen exactly as it was —
+  // never resetForNext, so an in-progress pickup underneath survives a
+  // mistaken open, and a 404/409 on Save doesn't strand the driver here.
+  function closeTicketView() {
+    ticketView.classList.add('hidden');
+    if (ticketState.openedFrom === 'confirm') {
+      confirmView.classList.remove('hidden');
+    } else {
+      captureView.classList.remove('hidden');
+    }
+  }
+  el('ticketCloseBtn').addEventListener('click', closeTicketView);
 
   function showTicketError(status) {
     let msg;
@@ -492,7 +527,13 @@
     };
     el('ticketDoneBtn').onclick = () => {
       ticketView.classList.add('hidden');
-      resetForNext();
+      if (ticketState.openedFrom === 'confirm') {
+        // Opened from the saved screen: that pickup is done, move on to the next stop.
+        resetForNext();
+      } else {
+        // Opened mid-capture from the awaiting row: leave the in-progress pickup intact.
+        captureView.classList.remove('hidden');
+      }
     };
   }
 
@@ -509,8 +550,8 @@
       const payload = {
         photo: photoBase64,
         netLb,
-        grossLb: grossInput.value.trim() ? parseInt(grossInput.value.trim(), 10) : null,
-        tareLb: tareInput.value.trim() ? parseInt(tareInput.value.trim(), 10) : null,
+        grossLb: optionalWeight(grossInput.value),
+        tareLb: optionalWeight(tareInput.value),
         facility: facilityInput.value.trim() || null,
         weighedAt: new Date().toISOString(),
         gps: state.gpsFixed ? state.gps : null,
@@ -525,6 +566,13 @@
       const data = await res.json().catch(() => ({}));
       if (status < 200 || status >= 300) {
         showTicketError(status);
+        if (status === 409) {
+          // Some other path already ticketed this pull; stop counting it as awaiting
+          // instead of leaving the row stale until the next full reload.
+          const rec409 = state.todayRecords.find((r) => r.id === ticketState.recordId);
+          if (rec409) rec409.ticket = true; // placeholder — real shape unknown here, just stops the awaiting count
+          renderAwaiting();
+        }
         ticketSaveBtn.disabled = false;
         ticketSaveBtn.textContent = 'Save ticket';
         return;
@@ -667,7 +715,7 @@
         ticket: null,
         pricing: null,
       };
-      addTicketBtn.onclick = () => openTicketView(savedRecord);
+      addTicketBtn.onclick = () => openTicketView(savedRecord, 'confirm');
     }
   }
 
