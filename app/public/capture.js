@@ -29,6 +29,32 @@
   const addressInput = el('addressInput');
   const stopList = el('stopList');
 
+  // ---- ticket screen ----
+  const ticketView = el('ticketView');
+  const ticketFormWrap = el('ticketFormWrap');
+  const ticketSavedWrap = el('ticketSavedWrap');
+  const ticketHeroWrap = el('ticketHeroWrap');
+  const netLbInput = el('netLbInput');
+  const grossInput = el('grossInput');
+  const tareInput = el('tareInput');
+  const facilityInput = el('facilityInput');
+  const moreToggle = el('moreToggle');
+  const moreBlock = el('moreBlock');
+  const ticketSaveBtn = el('ticketSaveBtn');
+  const ticketError = el('ticketError');
+  const awaitingRow = el('awaitingRow');
+  const awaitingDialog = el('awaitingDialog');
+  const awaitingList = el('awaitingList');
+  const ticketState = {
+    recordId: null,
+    address: '',
+    container: null,
+    pricing: null,
+    photoBlob: null,
+    t0: null,
+    openedFrom: null, // 'capture' | 'confirm' — which view to restore on Back/Done
+  };
+
   const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -89,6 +115,49 @@
     const today = localDate(new Date().toISOString());
     return state.todayRecords.some((r) => r.address === stop.address && localDate(r.capturedAt) === today);
   }
+  function formatTime(iso) {
+    return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // ---- awaiting a scale ticket ----
+  function awaitingTickets() {
+    return state.todayRecords.filter(
+      (r) => r.status === 'collected' && r.container && r.container.startsWith('RO-') && !r.ticket
+    );
+  }
+  function renderAwaiting() {
+    const list = awaitingTickets();
+    if (list.length === 0) {
+      awaitingRow.classList.add('hidden');
+      return;
+    }
+    awaitingRow.classList.remove('hidden');
+    el('awaitingText').textContent = `${list.length} ${list.length === 1 ? 'pull' : 'pulls'} awaiting a scale ticket`;
+  }
+  function renderAwaitingList() {
+    const list = awaitingTickets();
+    awaitingList.innerHTML = '';
+    list.forEach((r) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'picker-item';
+      b.innerHTML = '<span class="pi-addr"></span><span class="pi-meta"></span>';
+      const parts = r.address.split(',');
+      const rest = parts.slice(1).join(',').trim();
+      b.querySelector('.pi-addr').textContent = parts[0].trim();
+      b.querySelector('.pi-meta').textContent = `${rest}${rest ? ' · ' : ''}${r.container} · picked up ${formatTime(r.capturedAt)}`;
+      b.addEventListener('click', () => {
+        awaitingDialog.close();
+        openTicketView(r, 'capture');
+      });
+      awaitingList.appendChild(b);
+    });
+  }
+  awaitingRow.addEventListener('click', () => {
+    renderAwaitingList();
+    awaitingDialog.showModal();
+  });
+  el('awaitingClose').addEventListener('click', () => awaitingDialog.close());
 
   function renderRoute() {
     const now = new Date();
@@ -96,6 +165,7 @@
     const today = todaysStops();
     const segs = el('routeSegs');
     segs.innerHTML = '';
+    renderAwaiting();
     if (today.length === 0) {
       el('routePos').textContent = 'No scheduled stops today';
       el('routeDone').textContent = '';
@@ -285,6 +355,239 @@
   }
   wireCameraInput();
 
+  // ---- ticket photo / downscale (mirrors the pickup camera above) ----
+  function wireTicketCameraInput() {
+    const input = el('ticketCameraInput');
+    if (!input) return;
+    input.addEventListener('click', markTicketInteraction);
+    input.addEventListener('change', ticketCameraChangeHandler);
+  }
+  const ticketHeroEmptyHtml = ticketHeroWrap.innerHTML;
+
+  function resetTicketCamera() {
+    ticketState.photoBlob = null;
+    ticketHeroWrap.innerHTML = ticketHeroEmptyHtml;
+    ticketHeroWrap.classList.remove('has-photo');
+    wireTicketCameraInput();
+    updateTicketSaveEnabled();
+  }
+
+  async function ticketCameraChangeHandler(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    let blob;
+    try {
+      blob = await downscaleImage(file, 1400, 0.72);
+    } catch {
+      blob = file;
+    }
+    ticketState.photoBlob = blob;
+    const url = URL.createObjectURL(blob);
+    ticketHeroWrap.classList.add('has-photo');
+    ticketHeroWrap.innerHTML = `<img class="hero-photo" src="${url}" alt="Ticket photo"><button type="button" class="retake" id="ticketRetakeBtn">Retake</button>`;
+    el('ticketRetakeBtn').addEventListener('click', resetTicketCamera);
+    updateTicketSaveEnabled();
+  }
+
+  // ---- ticket screen wiring ----
+  function markTicketInteraction() {
+    if (ticketState.t0 === null) ticketState.t0 = Date.now();
+  }
+  ['input', 'click', 'focus'].forEach((ev) => {
+    ticketFormWrap.addEventListener(ev, markTicketInteraction, true);
+  });
+
+  function validNet(v) {
+    if (!/^[0-9]+$/.test(v)) return false;
+    const n = parseInt(v, 10);
+    return n >= 1 && n <= 80000;
+  }
+  function updateTicketSaveEnabled() {
+    ticketSaveBtn.disabled = !(ticketState.photoBlob && validNet(netLbInput.value.trim()));
+  }
+  netLbInput.addEventListener('input', updateTicketSaveEnabled);
+
+  // Gross/tare are optional integers: strip anything non-numeric as it's typed, and only
+  // ever send a value that parses to an in-range integer — never NaN, never free text.
+  function digitsOnlyInput(input) {
+    input.addEventListener('input', () => {
+      const cleaned = input.value.replace(/[^0-9]/g, '');
+      if (cleaned !== input.value) input.value = cleaned;
+    });
+  }
+  digitsOnlyInput(grossInput);
+  digitsOnlyInput(tareInput);
+  function optionalWeight(v) {
+    const s = v.trim();
+    if (!/^[0-9]+$/.test(s)) return null;
+    const n = parseInt(s, 10);
+    return n >= 1 && n <= 80000 ? n : null;
+  }
+
+  moreToggle.addEventListener('click', () => {
+    const opening = moreBlock.classList.contains('hidden');
+    moreBlock.classList.toggle('hidden');
+    moreToggle.textContent = opening ? '− Gross / tare / facility' : '+ Gross / tare / facility';
+  });
+
+  function renderTicketHeader(record) {
+    const now = new Date();
+    el('ticketDayLine').textContent = `${DAY_SHORT[now.getDay()]} ${now.getDate()} ${MONTH_SHORT[now.getMonth()]}`;
+    const today = todaysStops();
+    const stop = today.find((s) => s.address === record.address || (record.container && s.container === record.container));
+    const routePos = el('ticketRoutePos');
+    routePos.textContent = '';
+    const b = document.createElement('b');
+    b.textContent = 'Scale ticket';
+    routePos.appendChild(b);
+    if (stop) routePos.append(` · stop ${stop.routeOrder} of ${today.length}`);
+    el('ticketPickedUp').textContent = record.capturedAt ? `picked up ${formatTime(record.capturedAt)}` : '';
+    const parts = (record.address || '').split(',');
+    el('ticketAddr').textContent = parts[0].trim();
+    const rest = parts.slice(1).join(',').trim();
+    const meta = el('ticketMeta');
+    meta.innerHTML = '';
+    if (rest) meta.append(rest);
+    if (record.container) {
+      if (rest) meta.append(' · ');
+      const code = document.createElement('code');
+      code.textContent = record.container;
+      meta.appendChild(code);
+    }
+  }
+
+  function resetTicketForm() {
+    netLbInput.value = '';
+    grossInput.value = '';
+    tareInput.value = '';
+    facilityInput.value = '';
+    moreBlock.classList.add('hidden');
+    moreToggle.textContent = '+ Gross / tare / facility';
+    ticketError.classList.add('hidden');
+    ticketError.textContent = '';
+    ticketSaveBtn.disabled = true;
+    ticketSaveBtn.textContent = 'Save ticket';
+    ticketState.t0 = null;
+    resetTicketCamera();
+  }
+
+  function openTicketView(record, openedFrom) {
+    ticketState.recordId = record.id;
+    ticketState.address = record.address;
+    ticketState.container = record.container || null;
+    ticketState.pricing = record.pricing || null;
+    ticketState.openedFrom = openedFrom === 'confirm' ? 'confirm' : 'capture';
+    resetTicketForm();
+    renderTicketHeader(record);
+    captureView.classList.add('hidden');
+    confirmView.classList.add('hidden');
+    ticketSavedWrap.classList.add('hidden');
+    ticketFormWrap.classList.remove('hidden');
+    ticketView.classList.remove('hidden');
+  }
+
+  // Back leaves whichever view opened the ticket screen exactly as it was —
+  // never resetForNext, so an in-progress pickup underneath survives a
+  // mistaken open, and a 404/409 on Save doesn't strand the driver here.
+  function closeTicketView() {
+    ticketView.classList.add('hidden');
+    if (ticketState.openedFrom === 'confirm') {
+      confirmView.classList.remove('hidden');
+    } else {
+      captureView.classList.remove('hidden');
+    }
+  }
+  el('ticketCloseBtn').addEventListener('click', closeTicketView);
+
+  function showTicketError(status) {
+    let msg;
+    if (status === 409) msg = 'This pull already has a ticket.';
+    else if (status === 400) msg = 'Check the photo and the net weight.';
+    else if (status === 404) msg = 'That record no longer exists.';
+    else msg = 'Could not save. Check your connection and try again.';
+    ticketError.textContent = msg;
+    ticketError.classList.remove('hidden');
+  }
+
+  function showTicketSaved(url, netLb, pricing) {
+    ticketFormWrap.classList.add('hidden');
+    ticketSavedWrap.classList.remove('hidden');
+    const includedLb = pricing && typeof pricing.includedLb === 'number' ? pricing.includedLb : 2000;
+    const overLb = Math.max(0, netLb - includedLb);
+    let headline = `Ticket tied · ${netLb.toLocaleString()} lb`;
+    if (overLb > 0) headline += ` · ${overLb.toLocaleString()} lb over`;
+    el('ticketSavedHeadline').textContent = headline;
+    el('ticketSavedSub').textContent =
+      ticketState.address.split(',')[0].trim() + (ticketState.container ? ` · ${ticketState.container}` : '');
+    el('ticketProofUrlText').textContent = location.origin + url;
+    el('ticketCopyLinkBtn').onclick = () => {
+      navigator.clipboard?.writeText(location.origin + url);
+      el('ticketCopyLinkBtn').textContent = 'Copied';
+      setTimeout(() => (el('ticketCopyLinkBtn').textContent = 'Copy link'), 1500);
+    };
+    el('ticketDoneBtn').onclick = () => {
+      ticketView.classList.add('hidden');
+      if (ticketState.openedFrom === 'confirm') {
+        // Opened from the saved screen: that pickup is done, move on to the next stop.
+        resetForNext();
+      } else {
+        // Opened mid-capture from the awaiting row: leave the in-progress pickup intact.
+        captureView.classList.remove('hidden');
+      }
+    };
+  }
+
+  ticketSaveBtn.addEventListener('click', async () => {
+    if (ticketSaveBtn.disabled) return;
+    markTicketInteraction();
+    ticketSaveBtn.disabled = true;
+    ticketSaveBtn.textContent = 'Saving…';
+    ticketError.classList.add('hidden');
+    const ticketMs = Date.now() - (ticketState.t0 || Date.now());
+    const netLb = parseInt(netLbInput.value.trim(), 10);
+    try {
+      const photoBase64 = await blobToBase64(ticketState.photoBlob);
+      const payload = {
+        photo: photoBase64,
+        netLb,
+        grossLb: optionalWeight(grossInput.value),
+        tareLb: optionalWeight(tareInput.value),
+        facility: facilityInput.value.trim() || null,
+        weighedAt: new Date().toISOString(),
+        gps: state.gpsFixed ? state.gps : null,
+        ticketMs,
+      };
+      const res = await fetch(`/api/records/${ticketState.recordId}/ticket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const status = res.status;
+      const data = await res.json().catch(() => ({}));
+      if (status < 200 || status >= 300) {
+        showTicketError(status);
+        if (status === 409) {
+          // Some other path already ticketed this pull; stop counting it as awaiting
+          // instead of leaving the row stale until the next full reload.
+          const rec409 = state.todayRecords.find((r) => r.id === ticketState.recordId);
+          if (rec409) rec409.ticket = true; // the server has one; a reload would fetch it. Truthy is enough to drop it from the awaiting count.
+          renderAwaiting();
+        }
+        ticketSaveBtn.disabled = false;
+        ticketSaveBtn.textContent = 'Save ticket';
+        return;
+      }
+      const rec = state.todayRecords.find((r) => r.id === ticketState.recordId);
+      if (rec) rec.ticket = { netLb };
+      renderAwaiting();
+      showTicketSaved(data.url, netLb, ticketState.pricing);
+    } catch (err) {
+      showTicketError(0);
+      ticketSaveBtn.disabled = false;
+      ticketSaveBtn.textContent = 'Save ticket';
+    }
+  });
+
   // ---- status / reasons ----
   statusRow.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-status]');
@@ -364,8 +667,16 @@
       });
       if (!res.ok) throw new Error('save failed');
       const data = await res.json();
-      state.todayRecords.push({ address: payload.address, capturedAt: payload.capturedAt });
-      showConfirm(data.url, captureMs);
+      state.todayRecords.push({
+        id: data.id,
+        address: payload.address,
+        capturedAt: payload.capturedAt,
+        container: payload.container,
+        status: payload.status,
+        ticket: null,
+        pricing: null,
+      });
+      showConfirm(data.id, data.url, captureMs);
     } catch (err) {
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save record';
@@ -373,7 +684,7 @@
     }
   });
 
-  function showConfirm(url, ms) {
+  function showConfirm(id, url, ms) {
     captureView.classList.add('hidden');
     confirmView.classList.remove('hidden');
     el('elapsedText').textContent = `Recorded in ${(ms / 1000).toFixed(1)}s`;
@@ -391,6 +702,21 @@
       shareBtn.onclick = () => navigator.share({ title: 'Collected — service record', url: location.origin + url }).catch(() => {});
     }
     el('nextStopBtn').onclick = resetForNext;
+    const addTicketBtn = el('addTicketBtn');
+    const eligible = state.status === 'collected' && !!state.container && state.container.startsWith('RO-');
+    addTicketBtn.classList.toggle('hidden', !eligible);
+    if (eligible) {
+      const savedRecord = {
+        id,
+        address: state.address,
+        container: state.container,
+        status: state.status,
+        capturedAt: state.capturedAt || new Date().toISOString(),
+        ticket: null,
+        pricing: null,
+      };
+      addTicketBtn.onclick = () => openTicketView(savedRecord, 'confirm');
+    }
   }
 
   function resetForNext() {
@@ -433,7 +759,15 @@
       const today = localDate(new Date().toISOString());
       state.todayRecords = (data.records || [])
         .filter((r) => localDate(r.capturedAt) === today)
-        .map((r) => ({ address: r.address, capturedAt: r.capturedAt }));
+        .map((r) => ({
+          id: r.id,
+          address: r.address,
+          capturedAt: r.capturedAt,
+          container: r.container,
+          status: r.status,
+          ticket: r.ticket || null,
+          pricing: r.pricing || null,
+        }));
       defaultToRouteStop();
       maybeAutoSelectNearest();
       renderRoute();
