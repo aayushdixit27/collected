@@ -1,14 +1,5 @@
 // Renders a small deterministic SVG "photo" stand-in for seed records.
-import { mulberry32 } from './prng.js';
-
-function hashStr(s) {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
+import { mulberry32, hashStr } from './prng.js';
 
 export function renderPhotoSvg(record) {
   const rand = mulberry32(hashStr(record.id));

@@ -49,6 +49,113 @@ async function waitForServer(base, tries = 50) {
   throw new Error('server did not start in time');
 }
 
+// Round-1 checker findings 1+2: a legacy (pre-ticket-feature) index is a bare shape with no
+// `pricing`/`ticket` on real records, and some real records may predate the `seed` flag
+// entirely. Spins up its own dev.js against a data dir seeded with a hand-written legacy
+// index, then asserts the migration in lib/store.js's ensureSeeded() keeps every real
+// record (flagged `seed:false` or missing the flag altogether), backfills each with
+// `pricing`/`ticket`, purges the one `seed:true` row, and still produces the pinned demo
+// record.
+async function testMigration() {
+  const migDir = await fs.mkdtemp(path.join(os.tmpdir(), 'collected-migration-'));
+  const legacyIndex = {
+    seedVersion: 1, // pre-ticket-feature stamp: must trigger regeneration
+    records: [
+      {
+        id: '999901-aaaa',
+        address: '1 Legacy Seed Rd, Columbus, OH 43215',
+        container: 'CT-96-1',
+        status: 'collected',
+        reason: null,
+        note: null,
+        capturedAt: '2026-01-01T12:00:00.000Z',
+        receivedAt: '2026-01-01T12:00:00.000Z',
+        gps: null,
+        photoUrl: '/api/photo/999901-aaaa.svg',
+        captureMs: 6000,
+        seed: true, // must be purged on migration
+      },
+      {
+        id: '999902-bbbb',
+        address: '2 Real Capture Rd, Columbus, OH 43215',
+        container: 'CT-96-2',
+        status: 'collected',
+        reason: null,
+        note: null,
+        capturedAt: '2026-01-02T12:00:00.000Z',
+        receivedAt: '2026-01-02T12:00:00.000Z',
+        gps: null,
+        photoUrl: '/api/photo/999902-bbbb.jpg',
+        captureMs: 5500,
+        seed: false, // real record, pre-ticket-feature: no pricing/ticket keys yet
+      },
+      {
+        id: '999903-cccc',
+        address: '3 Legacy Real Rd, Columbus, OH 43215',
+        container: 'CT-96-3',
+        status: 'collected',
+        reason: null,
+        note: null,
+        capturedAt: '2026-01-03T12:00:00.000Z',
+        receivedAt: '2026-01-03T12:00:00.000Z',
+        gps: null,
+        photoUrl: '/api/photo/999903-cccc.jpg',
+        captureMs: 5200,
+        // no `seed` key at all: an even older real record, predating the flag itself
+      },
+    ],
+  };
+  await fs.writeFile(path.join(migDir, 'index.json'), JSON.stringify(legacyIndex));
+
+  const port = await getFreePort();
+  const base = `http://localhost:${port}`;
+  const child = spawn(process.execPath, ['dev.js'], {
+    cwd: APP_DIR,
+    env: { ...process.env, PORT: String(port), COLLECTED_DATA_DIR: migDir },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let serverOutput = '';
+  child.stdout.on('data', (d) => (serverOutput += d.toString()));
+  child.stderr.on('data', (d) => (serverOutput += d.toString()));
+
+  try {
+    await waitForServer(base);
+
+    const listRes = await fetch(`${base}/api/records`);
+    const listData = await listRes.json();
+
+    const purgedSeed = listData.records.find((r) => r.id === '999901-aaaa');
+    ok(!purgedSeed, 'migration: pre-migration seed:true row is purged, not kept');
+
+    const realNoFields = listData.records.find((r) => r.id === '999902-bbbb');
+    ok(!!realNoFields, 'migration: real record with seed:false survives migration');
+    ok(
+      !!realNoFields && realNoFields.pricing && realNoFields.pricing.includedLb === 2000 && realNoFields.pricing.ratePerTon === 95,
+      'migration: real record with seed:false is backfilled with pricing {includedLb:2000, ratePerTon:95}'
+    );
+    ok(!!realNoFields && realNoFields.ticket === null, 'migration: real record with seed:false is backfilled with ticket: null');
+
+    const realNoFlag = listData.records.find((r) => r.id === '999903-cccc');
+    ok(!!realNoFlag, 'migration: real record with no seed key at all survives migration (predicate is r.seed !== true)');
+    ok(
+      !!realNoFlag && realNoFlag.pricing && realNoFlag.pricing.includedLb === 2000 && realNoFlag.pricing.ratePerTon === 95,
+      'migration: real record with no seed key is backfilled with pricing {includedLb:2000, ratePerTon:95}'
+    );
+    ok(!!realNoFlag && realNoFlag.ticket === null, 'migration: real record with no seed key is backfilled with ticket: null');
+
+    const pinnedAfterMigration = listData.records.find((r) => r.id === '260812-nycx');
+    ok(!!pinnedAfterMigration, 'migration: pinned record 260812-nycx exists after seed regeneration');
+  } catch (err) {
+    failures += 1;
+    console.log(`  FAIL - migration test crashed: ${err && err.message}`);
+    console.log('--- migration server output ---');
+    console.log(serverOutput);
+  } finally {
+    child.kill();
+    await fs.rm(migDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 async function main() {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'collected-smoke-'));
   const port = await getFreePort();
@@ -180,6 +287,10 @@ async function main() {
     ok(!ticketSvgBody.includes(pinnedData.container), 'ticket svg body does not contain the container id');
     ok(ticketSvgBody.includes('synthetic demo image'), 'ticket svg is labelled synthetic demo image');
 
+    // 11b. pinned ticket shows the facility's local wall-clock (07:41 PDT), not UTC (14:41)
+    ok(ticketSvgBody.includes('07:41'), 'pinned ticket svg shows local time 07:41 (PDT), not UTC');
+    ok(!ticketSvgBody.includes('14:41'), 'pinned ticket svg does not show the raw UTC time 14:41');
+
     // 12. GET /api/schedule stops carry includedLb/ratePerTon
     const scheduleRes = await fetch(`${base}/api/schedule`);
     ok(scheduleRes.status === 200, `GET /api/schedule returns 200 (got ${scheduleRes.status})`);
@@ -280,6 +391,8 @@ async function main() {
     child.kill();
     await fs.rm(dataDir, { recursive: true, force: true }).catch(() => {});
   }
+
+  await testMigration();
 
   console.log('');
   if (failures > 0) {

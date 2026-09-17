@@ -9,3 +9,15 @@ export function mulberry32(seed) {
     return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+// FNV-1a string hash, used everywhere a stable per-id PRNG seed is needed (svgphoto.js,
+// svgticket.js, seedgen.js's per-record ticket stream). Was duplicated three times; lives
+// here now so all three draw from one definition.
+export function hashStr(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}

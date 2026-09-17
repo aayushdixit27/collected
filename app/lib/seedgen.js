@@ -1,5 +1,5 @@
 // Deterministic seed data: ~40 schedule stops across six US markets + 45 days of history.
-import { mulberry32 } from './prng.js';
+import { mulberry32, hashStr } from './prng.js';
 import { ALPHABET, datePrefix } from './ids.js';
 
 // Fictional street numbers on real street names. Coordinates are a plausible box per
@@ -38,13 +38,32 @@ const FACILITIES = [
   'Sunset Scavenger Transfer Station',
 ];
 
-function hashStr(s) {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
+// Zone abbreviation a paper ticket in each market would actually print. Offsets come
+// straight off MARKETS.utcOffsetMin above (kept in one place, not restated here) so the
+// two can never drift apart; only the abbreviation is market-specific (AZ doesn't observe
+// DST, so it's MST rather than MDT even though the UTC offset matches PDT's).
+const STATE_OFFSET_MIN = Object.fromEntries(MARKETS.map((m) => [m.state, m.utcOffsetMin]));
+const STATE_ZONE_ABBR = { CA: 'PDT', AZ: 'MST', TX: 'CDT', GA: 'EDT', OH: 'EDT', NC: 'EDT' };
+
+function stateFromAddress(address) {
+  const m = typeof address === 'string' && address.match(/,\s*([A-Z]{2})\s+\d{5}\s*$/);
+  return m ? m[1] : null;
+}
+
+// Renders an ISO instant as the wall-clock time a paper ticket would actually print: the
+// market's local time and zone abbreviation (e.g. "07:41 PDT"), not UTC. Records don't
+// carry their own timezone, so this derives one from the address's state; an address
+// outside the six seeded markets (or missing/malformed) falls back to plain UTC.
+export function localTimeLabel(iso, address) {
+  const state = stateFromAddress(address);
+  const offsetMin = state ? STATE_OFFSET_MIN[state] : undefined;
+  const abbr = state ? STATE_ZONE_ABBR[state] : undefined;
+  if (offsetMin === undefined || !abbr) {
+    const d = new Date(iso);
+    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`;
   }
-  return h >>> 0;
+  const local = new Date(Date.parse(iso) - offsetMin * 60000);
+  return `${String(local.getUTCHours()).padStart(2, '0')}:${String(local.getUTCMinutes()).padStart(2, '0')} ${abbr}`;
 }
 
 // Ticket fields are drawn from a PRNG keyed by the record's OWN id, never the shared `rand`

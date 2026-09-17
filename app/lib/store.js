@@ -128,8 +128,17 @@ export async function putRecord(record, photoJpegBuffer) {
 //
 // An index at the current seedVersion is left alone. Anything else (missing entirely, or
 // stamped with an older/no seedVersion) is regenerated — but any non-seed record already in
-// it (a real capture, `seed: false`) survives the regeneration; only the seed rows are
-// replaced.
+// it (a real capture) survives the regeneration; only the seed rows are replaced.
+//
+// Two things this migration must get right, both fixed after round-1 checker findings:
+// - The keep predicate is `r.seed !== true`, not `r.seed === false`. A real record from
+//   before `seed` existed at all has no flag; treating "flag missing" as "drop it" would
+//   silently delete real phone captures on the one-time migration. Only an explicit
+//   `seed: true` is safe to discard.
+// - A kept real record is backfilled with `pricing`/`ticket` if it predates this round
+//   (pre-migration Blob records have neither key). Without this, `GET /api/records[/:id]`
+//   would omit fields the contract says every record returns, and any reader doing
+//   `record.pricing.includedLb` on a real record would throw.
 export async function ensureSeeded() {
   const existing = await readIndex();
   if (existing && existing.seedVersion === SEED_VERSION && existing.records.length > 0) {
@@ -138,7 +147,15 @@ export async function ensureSeeded() {
 
   const schedule = generateSchedule();
   const seeded = generateSeedRecords(schedule, Date.now());
-  const kept = existing ? existing.records.filter((r) => r.seed === false) : [];
+  const kept = existing
+    ? existing.records
+        .filter((r) => r.seed !== true)
+        .map((r) => ({
+          ...r,
+          pricing: r.pricing ?? { includedLb: 2000, ratePerTon: 95 },
+          ticket: r.ticket ?? null,
+        }))
+    : [];
   const merged = seeded.concat(kept).sort((a, b) => new Date(b.capturedAt) - new Date(a.capturedAt));
 
   if (useBlob()) await writeBlobIndex(merged);

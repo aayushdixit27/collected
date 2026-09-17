@@ -1,16 +1,8 @@
 // Renders a small deterministic SVG "paper ticket" stand-in for seed records that have a
 // scale ticket. Deliberately never draws the container id or the address: the whole point
 // of the customer complaint this feature answers is a ticket that cannot be tied to either.
-import { mulberry32 } from './prng.js';
-
-function hashStr(s) {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
+import { mulberry32, hashStr } from './prng.js';
+import { localTimeLabel } from './seedgen.js';
 
 function escapeXml(s) {
   return String(s)
@@ -30,7 +22,8 @@ export function renderTicketSvg(record) {
 
   const dt = ticket.weighedAt ? new Date(ticket.weighedAt) : null;
   const dateStr = dt ? dt.toISOString().slice(0, 10) : '—';
-  const timeStr = dt ? `${dt.toISOString().slice(11, 16)} UTC` : '—';
+  // A paper ticket shows the facility's local wall-clock, not UTC.
+  const timeStr = ticket.weighedAt ? localTimeLabel(ticket.weighedAt, record.address) : '—';
 
   const lines = [
     `Facility: ${ticket.facility || 'Unnamed transfer station'}`,
