@@ -38,7 +38,7 @@
       return ` <span class="has-ticket">· ticket ${r.ticket.netLb.toLocaleString()} lb</span>`;
     }
     if (r.status === 'collected' && r.container && r.container.startsWith('RO-')) {
-      return ' <span class="no-ticket">· no ticket</span>';
+      return ' <span class="no-ticket">· no ticket yet</span>';
     }
     return '';
   }
