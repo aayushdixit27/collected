@@ -297,6 +297,11 @@
     if (!input) return;
     input.addEventListener('click', markInteraction);
     input.addEventListener('change', cameraChangeHandler);
+    const lib = el('libraryInput');
+    if (lib) {
+      lib.addEventListener('click', markInteraction);
+      lib.addEventListener('change', cameraChangeHandler);
+    }
   }
   const heroEmptyHtml = heroWrap.innerHTML;
 
@@ -361,6 +366,11 @@
     if (!input) return;
     input.addEventListener('click', markTicketInteraction);
     input.addEventListener('change', ticketCameraChangeHandler);
+    const lib = el('ticketLibraryInput');
+    if (lib) {
+      lib.addEventListener('click', markTicketInteraction);
+      lib.addEventListener('change', ticketCameraChangeHandler);
+    }
   }
   const ticketHeroEmptyHtml = ticketHeroWrap.innerHTML;
 
