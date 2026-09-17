@@ -9,7 +9,9 @@ import { fileURLToPath } from 'node:url';
 
 import recordsHandler from './api/records.js';
 import recordByIdHandler from './api/records/[id].js';
+import recordTicketHandler from './api/records/[id]/ticket.js';
 import photoHandler from './api/photo/[file].js';
+import ticketFileHandler from './api/ticket/[file].js';
 import scheduleHandler from './api/schedule.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -64,12 +66,20 @@ const server = http.createServer(async (req, res) => {
       await recordsHandler(req, res);
       return;
     }
+    if (/^\/api\/records\/[^/]+\/ticket$/.test(pathname)) {
+      await recordTicketHandler(req, res);
+      return;
+    }
     if (/^\/api\/records\/[^/]+$/.test(pathname)) {
       await recordByIdHandler(req, res);
       return;
     }
     if (/^\/api\/photo\/[^/]+$/.test(pathname)) {
       await photoHandler(req, res);
+      return;
+    }
+    if (/^\/api\/ticket\/[^/]+$/.test(pathname)) {
+      await ticketFileHandler(req, res);
       return;
     }
     if (pathname === '/api/schedule') {

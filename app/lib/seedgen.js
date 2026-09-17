@@ -22,6 +22,77 @@ const MARKETS = [
 const SCHEDULE_SEED = 87231;
 const RECORD_SEED_BASE = 40915;
 
+// Every stop bills the same schedule for round 1: 2,000 lb included, $95/ton after that.
+const INCLUDED_LB = 2000;
+const RATE_PER_TON = 95;
+
+// Plausible third-party transfer stations. Not tied to a market on purpose — a roll-off
+// hauler doesn't always dump at the facility nearest the stop, and the pinned demo ticket
+// (Zanker Road) is itself a Bay Area facility used for a Santa Clara stop.
+const FACILITIES = [
+  'Zanker Road Transfer Station',
+  'Newby Island Resource Recovery Park',
+  'Recology Transfer Station',
+  'Republic Services Transfer Station',
+  'WM Recycle America MRF',
+  'Sunset Scavenger Transfer Station',
+];
+
+function hashStr(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+// Ticket fields are drawn from a PRNG keyed by the record's OWN id, never the shared `rand`
+// stream the loop below uses for ids/status/gps. That is what lets this feature be added
+// without shifting a single existing id: nothing here consumes from the main stream.
+function ticketFor(record, isPinned) {
+  if (isPinned) {
+    // Pinned demo record, exact values per MISSION: net 5,340 / gross 19,860 / tare 14,520
+    // at Zanker Road, weighed 07:41 PDT the same day (14:41 UTC in August).
+    return {
+      photoUrl: `/api/ticket/${record.id}.svg`,
+      netLb: 5340,
+      grossLb: 19860,
+      tareLb: 14520,
+      facility: 'Zanker Road Transfer Station',
+      weighedAt: '2026-08-12T14:41:00.000Z',
+      gps: null,
+      ticketMs: 4100,
+    };
+  }
+
+  const kind = (record.container || '').split('-')[0];
+  if (kind !== 'RO' || record.status !== 'collected') return null;
+
+  const trand = mulberry32(hashStr(record.id + ':ticket'));
+  if (trand() >= 0.75) return null; // ~75% of RO collected records get a ticket
+
+  const netLb = Math.round(1200 + trand() * 6600); // 1,200-7,800 lb per MISSION
+  const trueTare = Math.round(9000 + trand() * 7000); // realistic empty roll-off + truck tare
+  const grossLb = trueTare + netLb;
+  const hasTare = trand() >= 0.3; // ~30% of tickets omit the tare line
+  const facility = FACILITIES[Math.floor(trand() * FACILITIES.length)];
+  const delayMin = 40 + trand() * 80; // weighed 40-120 min after pickup
+  const weighedAt = new Date(Date.parse(record.capturedAt) + delayMin * 60000).toISOString();
+  const ticketMs = Math.round(2200 + trand() * 3600);
+
+  return {
+    photoUrl: `/api/ticket/${record.id}.svg`,
+    netLb,
+    grossLb,
+    tareLb: hasTare ? trueTare : null,
+    facility,
+    weighedAt,
+    gps: null,
+    ticketMs,
+  };
+}
+
 function containerFor(kind, rand) {
   if (kind === 'RO') {
     const size = [10, 20, 30, 40][Math.floor(rand() * 4)];
@@ -51,6 +122,8 @@ export function generateSchedule() {
     lat: 37.3896,
     lon: -121.9793,
     utcOffsetMin: 7 * 60,
+    includedLb: INCLUDED_LB,
+    ratePerTon: RATE_PER_TON,
   });
 
   while (stops.length < 40) {
@@ -72,6 +145,8 @@ export function generateSchedule() {
       lat: Number(lat.toFixed(5)),
       lon: Number(lon.toFixed(5)),
       utcOffsetMin: m.utcOffsetMin,
+      includedLb: INCLUDED_LB,
+      ratePerTon: RATE_PER_TON,
     });
   }
 
@@ -173,7 +248,7 @@ export function generateSeedRecords(schedule, seedTimeMs = Date.now(), seed = RE
       const note = isPinned ? null : noteFor(reason, rand);
       const id = makeSeedId(capturedAt);
 
-      records.push({
+      const record = {
         id,
         address: stop.address,
         container: stop.container,
@@ -186,7 +261,11 @@ export function generateSeedRecords(schedule, seedTimeMs = Date.now(), seed = RE
         photoUrl: `/api/photo/${id}.svg`,
         captureMs,
         seed: true,
-      });
+        pricing: { includedLb: stop.includedLb, ratePerTon: stop.ratePerTon },
+      };
+      record.ticket = ticketFor(record, isPinned);
+
+      records.push(record);
 
       if (isPinned) pinnedFound = true;
     });
@@ -196,7 +275,7 @@ export function generateSeedRecords(schedule, seedTimeMs = Date.now(), seed = RE
     const stop = schedule.find((s) => s.address.startsWith('1428 Mission College Blvd'));
     const capturedAt = '2026-08-12T13:22:00.000Z';
     const id = makeSeedId(capturedAt);
-    records.push({
+    const record = {
       id,
       address: stop ? stop.address : '1428 Mission College Blvd, Santa Clara, CA 95054',
       container: stop ? stop.container : 'RO-20-114',
@@ -209,7 +288,10 @@ export function generateSeedRecords(schedule, seedTimeMs = Date.now(), seed = RE
       photoUrl: `/api/photo/${id}.svg`,
       captureMs: 6400,
       seed: true,
-    });
+      pricing: { includedLb: stop ? stop.includedLb : INCLUDED_LB, ratePerTon: stop ? stop.ratePerTon : RATE_PER_TON },
+    };
+    record.ticket = ticketFor(record, true);
+    records.push(record);
   }
 
   records.sort((a, b) => new Date(b.capturedAt) - new Date(a.capturedAt));

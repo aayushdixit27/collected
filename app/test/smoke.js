@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { overage } from '../lib/overage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(__dirname, '..');
@@ -137,6 +138,144 @@ async function main() {
       body: JSON.stringify({ ...postBody, photo: undefined }),
     });
     ok(badPostRes.status === 400, `POST without photo returns 400 (got ${badPostRes.status})`);
+
+    // 8. overage() pure-function cases
+    const caseUnder = overage({ netLb: 1500, includedLb: 2000, ratePerTon: 95 });
+    ok(caseUnder.overLb === 0 && caseUnder.charge === 0, `overage: net < included -> overLb 0, charge 0.00 (got ${JSON.stringify(caseUnder)})`);
+
+    const caseEqual = overage({ netLb: 2000, includedLb: 2000, ratePerTon: 95 });
+    ok(caseEqual.overLb === 0 && caseEqual.charge === 0, `overage: net == included -> overLb 0, charge 0.00 (got ${JSON.stringify(caseEqual)})`);
+
+    const caseOver = overage({ netLb: 3000, includedLb: 2000, ratePerTon: 95 });
+    ok(caseOver.overLb === 1000 && caseOver.charge === 47.5, `overage: net > included -> overLb 1000, charge 47.50 (got ${JSON.stringify(caseOver)})`);
+
+    const casePinned = overage({ netLb: 5340, includedLb: 2000, ratePerTon: 95 });
+    ok(casePinned.overLb === 3340 && casePinned.charge === 158.65, `overage: pinned record -> overLb 3340, charge 158.65 (got ${JSON.stringify(casePinned)})`);
+
+    // 9. pinned record 260812-nycx carries the exact ticket from MISSION
+    const pinnedRes = await fetch(`${base}/api/records/260812-nycx`);
+    ok(pinnedRes.status === 200, `GET /api/records/260812-nycx returns 200 (got ${pinnedRes.status})`);
+    const pinnedData = await pinnedRes.json();
+    ok(!!pinnedData.ticket, 'pinned record 260812-nycx has a ticket');
+    ok(pinnedData.ticket && pinnedData.ticket.netLb === 5340, `pinned record ticket netLb is 5340 (got ${pinnedData.ticket && pinnedData.ticket.netLb})`);
+    ok(pinnedData.ticket && pinnedData.ticket.grossLb === 19860, 'pinned record ticket grossLb is 19860');
+    ok(pinnedData.ticket && pinnedData.ticket.tareLb === 14520, 'pinned record ticket tareLb is 14520');
+    ok(pinnedData.ticket && pinnedData.ticket.facility === 'Zanker Road Transfer Station', 'pinned record ticket facility is Zanker Road Transfer Station');
+    ok(!!pinnedData.pricing && pinnedData.pricing.includedLb === 2000 && pinnedData.pricing.ratePerTon === 95, 'pinned record pricing is includedLb 2000 / ratePerTon 95');
+
+    // 10. a seeded FL-* record has no ticket (only RO gets a scale ticket)
+    const flRecord = listData.records.find((r) => r.seed && r.container && r.container.startsWith('FL-'));
+    ok(!!flRecord, 'found a seeded FL-* record');
+    ok(!!flRecord && flRecord.ticket === null, `seeded FL-* record ${flRecord && flRecord.id} has no ticket`);
+
+    // 11. ticket SVG for the pinned record: 200, image/svg+xml, and never the address/container
+    const ticketSvgRes = await fetch(`${base}/api/ticket/260812-nycx.svg`);
+    ok(ticketSvgRes.status === 200, `GET /api/ticket/260812-nycx.svg returns 200 (got ${ticketSvgRes.status})`);
+    ok(
+      (ticketSvgRes.headers.get('content-type') || '').includes('image/svg+xml'),
+      'ticket svg response has image/svg+xml content-type'
+    );
+    const ticketSvgBody = await ticketSvgRes.text();
+    ok(!ticketSvgBody.includes(pinnedData.address), 'ticket svg body does not contain the record address');
+    ok(!ticketSvgBody.includes(pinnedData.container), 'ticket svg body does not contain the container id');
+    ok(ticketSvgBody.includes('synthetic demo image'), 'ticket svg is labelled synthetic demo image');
+
+    // 12. GET /api/schedule stops carry includedLb/ratePerTon
+    const scheduleRes = await fetch(`${base}/api/schedule`);
+    ok(scheduleRes.status === 200, `GET /api/schedule returns 200 (got ${scheduleRes.status})`);
+    const scheduleData = await scheduleRes.json();
+    ok(Array.isArray(scheduleData.stops) && scheduleData.stops.length > 0, 'GET /api/schedule returns stops');
+    ok(
+      scheduleData.stops[0].includedLb === 2000 && scheduleData.stops[0].ratePerTon === 95,
+      `GET /api/schedule stops carry includedLb 2000 / ratePerTon 95 (got ${JSON.stringify(scheduleData.stops[0])})`
+    );
+
+    // 13. POST /api/records/:id/ticket: full round trip on a fresh non-seed record
+    const freshPostRes = await fetch(`${base}/api/records`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        address: '42 Freshly Posted Ln, Columbus, OH 43215',
+        container: 'RO-30-777',
+        status: 'collected',
+        capturedAt: new Date().toISOString(),
+        captureMs: 4800,
+        photo: TINY_JPEG_B64,
+      }),
+    });
+    ok(freshPostRes.status === 201, `POST /api/records (for ticket test) returns 201 (got ${freshPostRes.status})`);
+    const freshRecord = await freshPostRes.json();
+
+    const ticketPostRes = await fetch(`${base}/api/records/${freshRecord.id}/ticket`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        photo: TINY_JPEG_B64,
+        netLb: 4500,
+        grossLb: 18000,
+        tareLb: 13500,
+        facility: 'Test Transfer Station',
+        weighedAt: new Date().toISOString(),
+        ticketMs: 3100,
+      }),
+    });
+    ok(ticketPostRes.status === 200, `POST /api/records/:id/ticket returns 200 (got ${ticketPostRes.status})`);
+    const ticketPostData = await ticketPostRes.json();
+    ok(ticketPostData.id === freshRecord.id, 'ticket POST response id matches the record id');
+    ok(ticketPostData.url === `/p/${freshRecord.id}`, 'ticket POST response url matches /p/:id');
+
+    const afterTicketRes = await fetch(`${base}/api/records/${freshRecord.id}`);
+    const afterTicketData = await afterTicketRes.json();
+    ok(!!afterTicketData.ticket && afterTicketData.ticket.netLb === 4500, 'GET record after ticket POST shows netLb 4500');
+    ok(afterTicketData.ticket.photoUrl === `/api/ticket/${freshRecord.id}.jpg`, 'ticketed record photoUrl points at local ticket jpg route');
+
+    const ticketJpgRes = await fetch(`${base}/api/ticket/${freshRecord.id}.jpg`);
+    ok(ticketJpgRes.status === 200, `GET /api/ticket/${freshRecord.id}.jpg returns 200 (got ${ticketJpgRes.status})`);
+
+    // 14. 409 on a second ticket POST for the same record
+    const secondTicketRes = await fetch(`${base}/api/records/${freshRecord.id}/ticket`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photo: TINY_JPEG_B64, netLb: 5000 }),
+    });
+    ok(secondTicketRes.status === 409, `second POST /api/records/:id/ticket returns 409 (got ${secondTicketRes.status})`);
+
+    // 15. 400 without photo, and 400 with netLb 0, against a fresh ticket-less record
+    const freshPostRes2 = await fetch(`${base}/api/records`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        address: '43 Freshly Posted Ln, Columbus, OH 43215',
+        container: 'RO-30-778',
+        status: 'collected',
+        capturedAt: new Date().toISOString(),
+        captureMs: 4800,
+        photo: TINY_JPEG_B64,
+      }),
+    });
+    const freshRecord2 = await freshPostRes2.json();
+
+    const noPhotoRes = await fetch(`${base}/api/records/${freshRecord2.id}/ticket`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ netLb: 4500 }),
+    });
+    ok(noPhotoRes.status === 400, `POST /api/records/:id/ticket without photo returns 400 (got ${noPhotoRes.status})`);
+
+    const zeroNetRes = await fetch(`${base}/api/records/${freshRecord2.id}/ticket`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photo: TINY_JPEG_B64, netLb: 0 }),
+    });
+    ok(zeroNetRes.status === 400, `POST /api/records/:id/ticket with netLb 0 returns 400 (got ${zeroNetRes.status})`);
+
+    // 16. 404 on ticket POST for an unknown id
+    const unknownTicketRes = await fetch(`${base}/api/records/nope/ticket`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photo: TINY_JPEG_B64, netLb: 4500 }),
+    });
+    ok(unknownTicketRes.status === 404, `POST /api/records/nope/ticket returns 404 (got ${unknownTicketRes.status})`);
   } finally {
     child.kill();
     await fs.rm(dataDir, { recursive: true, force: true }).catch(() => {});

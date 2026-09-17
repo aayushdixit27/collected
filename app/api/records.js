@@ -5,6 +5,9 @@ import { makeId } from '../lib/ids.js';
 
 const STATUSES = ['collected', 'delivered', 'removed', 'not_collected'];
 const REASONS = ['blocked_access', 'overfilled', 'contaminated', 'not_out'];
+// Every stop bills the same schedule for round 1 (see lib/seedgen.js); used whenever a
+// capture doesn't pass its own pricing along.
+const DEFAULT_PRICING = { includedLb: 2000, ratePerTon: 95 };
 
 async function readBody(req) {
   if (req.body !== undefined && req.body !== null) {
@@ -43,7 +46,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { address, container, status, reason, note, capturedAt, gps, captureMs, photo } = body || {};
+    const { address, container, status, reason, note, capturedAt, gps, captureMs, photo, pricing } = body || {};
 
     if (!address || typeof address !== 'string' || !address.trim()) {
       sendJson(res, 400, { error: 'address is required' });
@@ -95,6 +98,14 @@ export default async function handler(req, res) {
       photoUrl: null,
       captureMs: typeof captureMs === 'number' ? Math.round(captureMs) : null,
       seed: false,
+      // Set at capture from the stop (lane-2 sends it from /api/schedule); every stop
+      // currently shares one billing tier, so a missing/invalid value falls back to it
+      // rather than leaving real captures without a price to show against the ticket.
+      pricing:
+        pricing && typeof pricing.includedLb === 'number' && typeof pricing.ratePerTon === 'number'
+          ? { includedLb: pricing.includedLb, ratePerTon: pricing.ratePerTon }
+          : DEFAULT_PRICING,
+      ticket: null,
     };
 
     await putRecord(record, buf);
