@@ -54,10 +54,6 @@
     t0: null,
   };
 
-  // DEMO-FIXTURE: lane-1's ticket API and fields are not on this branch yet. Active only
-  // with ?demo=ticket in the URL; remove this whole block before final.
-  function isDemoTicket() { return location.search.indexOf('demo=ticket') !== -1; } // DEMO-FIXTURE
-
   const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -520,23 +516,13 @@
         gps: state.gpsFixed ? state.gps : null,
         ticketMs,
       };
-      let status;
-      let data;
-      if (isDemoTicket()) {
-        // DEMO-FIXTURE: lane-1's POST /api/records/:id/ticket does not exist on this branch.
-        // Resolve locally after ~300ms instead of calling the server.
-        await new Promise((resolve) => setTimeout(resolve, 300)); // DEMO-FIXTURE
-        status = 200; // DEMO-FIXTURE
-        data = { id: ticketState.recordId, url: `/p/${ticketState.recordId}` }; // DEMO-FIXTURE
-      } else {
-        const res = await fetch(`/api/records/${ticketState.recordId}/ticket`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        status = res.status;
-        data = await res.json().catch(() => ({}));
-      }
+      const res = await fetch(`/api/records/${ticketState.recordId}/ticket`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const status = res.status;
+      const data = await res.json().catch(() => ({}));
       if (status < 200 || status >= 300) {
         showTicketError(status);
         ticketSaveBtn.disabled = false;

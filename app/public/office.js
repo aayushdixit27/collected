@@ -33,25 +33,6 @@
     not_collected: 'Could not collect',
   };
 
-  // DEMO-FIXTURE: lane-1's ticket field is not on records on this branch yet. Active only
-  // with ?demo=ticket in the URL; remove this whole block before final.
-  function isDemoTicket() { return location.search.indexOf('demo=ticket') !== -1; } // DEMO-FIXTURE
-  function fixtureHash(id) { // DEMO-FIXTURE: small deterministic hash, keyed by record id
-    let h = 0; // DEMO-FIXTURE
-    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; // DEMO-FIXTURE
-    return h; // DEMO-FIXTURE
-  }
-  function decorateWithFixtureTickets(records) { // DEMO-FIXTURE
-    return records.map((r) => { // DEMO-FIXTURE
-      const isRoCollected = r.status === 'collected' && r.container && r.container.startsWith('RO-'); // DEMO-FIXTURE
-      if (!isRoCollected || r.ticket) return r; // DEMO-FIXTURE
-      const h = fixtureHash(r.id); // DEMO-FIXTURE
-      if (h % 100 >= 75) return r; // DEMO-FIXTURE: ~25% left without a ticket
-      const netLb = 1200 + (h % 6601); // DEMO-FIXTURE: 1,200..7,800 lb
-      return { ...r, ticket: { netLb } }; // DEMO-FIXTURE
-    });
-  }
-
   function ticketSuffix(r) {
     if (r.ticket && typeof r.ticket.netLb === 'number') {
       return ` · ticket ${r.ticket.netLb.toLocaleString()} lb`;
@@ -210,7 +191,6 @@
   ])
     .then(([recData, schedData]) => {
       allRecords = recData.records || [];
-      if (isDemoTicket()) allRecords = decorateWithFixtureTickets(allRecords); // DEMO-FIXTURE
       schedule = schedData.stops || [];
       render();
     })
