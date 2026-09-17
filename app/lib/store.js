@@ -12,14 +12,20 @@
 // 503. The old collected/index-<ts>.json files are read exactly once, by the migration, and
 // are otherwise dead.
 //
-// Testing: the Blob client is injectable. `_setBlobClientForTests({ put, list, fetch })`
-// switches this module onto the Blob code path with that client (and clears every
-// module-scope cache below, so each call behaves like a fresh serverless instance).
+// Ticket attach is guarded at the origin: the record is written with `ifMatch: <ETag read>`
+// (or `allowOverwrite: false` for a seed record's first override), so two attaches racing
+// past the handler's 409 check cannot both land; the loser gets a 409, not a lost update.
+//
+// Testing: the Blob client is injectable. `_setBlobClientForTests({ put, list, head, fetch,
+// BlobPreconditionFailedError })` switches this module onto the Blob code path with that
+// client (and clears every module-scope cache below, so each call behaves like a fresh
+// serverless instance).
 // test/fake-blob.js is the in-memory implementation; passing null restores the real
 // `@vercel/blob` + global fetch and the local backend. Nothing in lib/ imports from test/.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { generateSchedule, generateSeedRecords } from './seedgen.js';
+import { datePrefix, randomSuffix } from './ids.js';
 
 const DATA_DIR = process.env.COLLECTED_DATA_DIR || path.join(process.cwd(), '.data');
 const INDEX_FILE = path.join(DATA_DIR, 'index.json');
@@ -55,14 +61,27 @@ let injectedClient = null;
 let blobBase = process.env.BLOB_BASE_URL ? process.env.BLOB_BASE_URL.replace(/\/+$/, '') : null;
 let seedCache = null; // records array of the immutable seed once fetched
 let seedPromise = null; // single-flight: seed exists (or has been written) + migration ran
-// Records written by this process, newest write per id. Beats list() lag and the CDN
-// window for reads that land on the same instance as the write; see mergeRecent().
-const recent = new Map();
+let seedFailedAt = 0; // last time the seed check threw; retried only after SEED_RETRY_MS
+let seedLastError = null;
+const SEED_RETRY_MS = 1000;
+// Records written by this process, newest write per id, with the ETag the put returned.
+// Beats list() lag and the CDN window for reads that land on the same instance as the
+// write; see mergeRecent().
+const recent = new Map(); // id -> { record, etag }
 const RECENT_MAX = 500;
-function remember(record) {
+function remember(record, etag) {
   recent.delete(record.id);
-  recent.set(record.id, record);
+  recent.set(record.id, { record, etag: etag || null });
   if (recent.size > RECENT_MAX) recent.delete(recent.keys().next().value);
+}
+
+// Thrown by putTicket when the record already carries a ticket at the origin (ETag
+// mismatch or a seed override that already exists). The handler maps it to 409.
+export const TICKET_CONFLICT = 'ticket_conflict';
+function conflict() {
+  const err = new Error('ticket already recorded for this record');
+  err.code = TICKET_CONFLICT;
+  return err;
 }
 
 export function _setBlobClientForTests(client) {
@@ -70,6 +89,8 @@ export function _setBlobClientForTests(client) {
   blobBase = process.env.BLOB_BASE_URL ? process.env.BLOB_BASE_URL.replace(/\/+$/, '') : null;
   seedCache = null;
   seedPromise = null;
+  seedFailedAt = 0;
+  seedLastError = null;
   recent.clear();
 }
 
@@ -79,8 +100,15 @@ function useBlob() {
 
 async function blobClient() {
   if (injectedClient) return injectedClient;
-  const { put, list } = await import('@vercel/blob');
-  return { put, list, fetch: globalThis.fetch };
+  const { put, list, head, BlobPreconditionFailedError } = await import('@vercel/blob');
+  return { put, list, head, fetch: globalThis.fetch, BlobPreconditionFailedError };
+}
+
+// Up to three ids are tried on create; a collision at the origin (blob already exists)
+// means another instance took the id in the same second.
+const ID_TRIES = 3;
+function freshId(record) {
+  return `${datePrefix(record.capturedAt)}-${randomSuffix()}`;
 }
 
 function byNewest(a, b) {
@@ -126,13 +154,18 @@ async function localListRecords() {
 }
 
 async function localPutRecord(record, photoJpegBuffer) {
-  if (photoJpegBuffer) {
-    await fs.mkdir(PHOTOS_DIR, { recursive: true });
-    await fs.writeFile(path.join(PHOTOS_DIR, `${record.id}.jpg`), photoJpegBuffer);
-    record.photoUrl = `/api/photo/${record.id}.jpg`;
-  }
   return withLocalLock(async () => {
     const records = await localListRecords();
+    const taken = new Set(records.map((r) => r.id));
+    for (let i = 1; taken.has(record.id); i++) {
+      if (i >= ID_TRIES) throw new Error(`could not find a free id after ${ID_TRIES} tries`);
+      record.id = freshId(record);
+    }
+    if (photoJpegBuffer) {
+      await fs.mkdir(PHOTOS_DIR, { recursive: true });
+      await fs.writeFile(path.join(PHOTOS_DIR, `${record.id}.jpg`), photoJpegBuffer);
+      record.photoUrl = `/api/photo/${record.id}.jpg`;
+    }
     records.push(record);
     records.sort(byNewest);
     await writeLocalIndex(records);
@@ -172,6 +205,7 @@ async function localPutTicket(id, fields, jpegBuffer) {
     const records = await localListRecords();
     const idx = records.findIndex((r) => r.id === id);
     if (idx === -1) return null;
+    if (records[idx].ticket) throw conflict();
     const record = { ...records[idx], ticket: { photoUrl, ...fields } };
     records[idx] = record;
     await writeLocalIndex(records);
@@ -207,6 +241,13 @@ function isAlreadyExists(err) {
   return /already exists/i.test(String(err && err.message));
 }
 
+// `ifMatch` mismatch: the SDK throws BlobPreconditionFailedError (extends BlobError, no
+// custom name), so the class is checked when the client exposes it, the message otherwise.
+function isPreconditionFailed(err, client) {
+  if (client && client.BlobPreconditionFailedError && err instanceof client.BlobPreconditionFailedError) return true;
+  return /precondition failed|etag mismatch/i.test(String(err && err.message));
+}
+
 // Walks every page of a prefix listing. list() is eventually consistent; callers that need
 // a just-written blob use its deterministic URL instead.
 async function listAll(prefix) {
@@ -222,23 +263,26 @@ async function listAll(prefix) {
   return out;
 }
 
-// GET a JSON blob: parsed body, null on 404, throws on anything else. `bust` appends a
-// unique query so an edge cache keyed on the full URL cannot serve an older version.
+// GET a JSON blob: { json, etag } (etag null if the response carried none), null on 404,
+// throws on anything else. `bust` appends a unique query so an edge cache keyed on the
+// full URL cannot serve an older version.
 async function fetchJson(url, bust) {
   const { fetch: doFetch } = await blobClient();
   const target = bust ? `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}${Math.random().toString(36).slice(2, 8)}` : url;
   const res = await doFetch(target, { cache: 'no-store' });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`blob fetch ${res.status} for ${url}`);
-  return await res.json();
+  return { json: await res.json(), etag: res.headers.get('etag') || null };
 }
 
-async function putJson(key, obj, allowOverwrite) {
+// `guard` is one of { allowOverwrite: true }, { allowOverwrite: false } or
+// { ifMatch: <etag> } (which the SDK treats as an overwrite).
+async function putJson(key, obj, guard) {
   const { put } = await blobClient();
   const result = await put(key, JSON.stringify(obj), {
     access: 'public',
     addRandomSuffix: false,
-    allowOverwrite,
+    ...guard,
     contentType: 'application/json',
     cacheControlMaxAge: JSON_CACHE_MAX_AGE_S,
   });
@@ -254,8 +298,8 @@ async function fetchRecords(urls) {
   async function worker() {
     while (i < urls.length) {
       const url = urls[i++];
-      const rec = await fetchJson(url, true);
-      if (rec && rec.id) out.push(rec);
+      const got = await fetchJson(url, true);
+      if (got && got.json && got.json.id) out.push(got.json);
     }
   }
   await Promise.all(Array.from({ length: Math.min(FETCH_CONCURRENCY, urls.length) }, worker));
@@ -268,7 +312,7 @@ async function fetchRecords(urls) {
 function mergeRecent(id, fetched) {
   const mine = recent.get(id);
   if (!mine) return fetched;
-  if (fetched && fetched.ticket && !mine.ticket) return fetched;
+  if (fetched && fetched.record.ticket && !mine.record.ticket) return fetched;
   return mine;
 }
 
@@ -276,9 +320,9 @@ function mergeRecent(id, fetched) {
 // known to exist (blobEnsureSeeded ran, or is running and calling this from the migration).
 async function loadSeed() {
   if (seedCache) return seedCache;
-  const seed = await fetchJson(`${blobBase}/${SEED_KEY}`, false);
-  if (!seed || !Array.isArray(seed.records)) throw new Error('seed blob missing or malformed');
-  seedCache = seed.records;
+  const got = await fetchJson(`${blobBase}/${SEED_KEY}`, false);
+  if (!got || !Array.isArray(got.json.records)) throw new Error('seed blob missing or malformed');
+  seedCache = got.json.records;
   return seedCache;
 }
 
@@ -293,11 +337,17 @@ async function blobListRecords() {
   const overrides = await fetchRecords(blobs.map((b) => b.url));
   const byId = new Map(seed.map((r) => [r.id, r]));
   for (const r of overrides) byId.set(r.id, r);
-  for (const id of recent.keys()) byId.set(id, mergeRecent(id, byId.get(id) || null));
+  for (const id of recent.keys()) {
+    const stored = byId.get(id);
+    byId.set(id, mergeRecent(id, stored ? { record: stored, etag: null } : null).record);
+  }
   return Array.from(byId.values()).sort(byNewest);
 }
 
-async function blobGetRecord(id) {
+// Reads one record with its provenance: { record, etag, source } where source is 'blob'
+// (records/<id>.json, etag from the response), 'recent' (this instance's own last write,
+// etag from the put result) or 'seed' (no override exists yet). null if unknown.
+async function readRecord(id) {
   await blobEnsureSeeded();
   let fetched = null;
   if (blobBase) {
@@ -309,43 +359,103 @@ async function blobGetRecord(id) {
     const hit = blobs.find((b) => b.pathname === recordKey(id));
     if (hit) fetched = await fetchJson(hit.url, true);
   }
-  const merged = mergeRecent(id, fetched);
-  if (merged) return merged;
+  const stored = fetched ? { record: fetched.json, etag: fetched.etag } : null;
+  const merged = mergeRecent(id, stored);
+  if (merged) return { ...merged, source: merged === stored ? 'blob' : 'recent' };
   const seed = await blobSeedRecords();
-  return seed.find((r) => r.id === id) || null;
+  const row = seed.find((r) => r.id === id);
+  return row ? { record: row, etag: null, source: 'seed' } : null;
 }
 
+async function blobGetRecord(id) {
+  const got = await readRecord(id);
+  return got ? got.record : null;
+}
+
+// Create never overwrites: photo and record are both put with the SDK's default
+// (allowOverwrite false). "Already exists" on either means another instance took this id
+// in the same second; the id is regenerated and both puts retried, up to ID_TRIES.
 async function blobPutRecord(record, photoJpegBuffer) {
-  if (photoJpegBuffer) {
-    const { put } = await blobClient();
-    const { url } = await put(`${PHOTOS_PREFIX}${record.id}.jpg`, photoJpegBuffer, {
-      access: 'public',
-      addRandomSuffix: false,
-      contentType: 'image/jpeg',
-    });
-    rememberBase(url);
-    record.photoUrl = url;
+  const { put } = await blobClient();
+  for (let attempt = 1; ; attempt++) {
+    try {
+      if (photoJpegBuffer) {
+        const { url } = await put(`${PHOTOS_PREFIX}${record.id}.jpg`, photoJpegBuffer, {
+          access: 'public',
+          addRandomSuffix: false,
+          contentType: 'image/jpeg',
+        });
+        rememberBase(url);
+        record.photoUrl = url;
+      }
+      const result = await putJson(recordKey(record.id), record, { allowOverwrite: false });
+      remember(record, result.etag);
+      return record;
+    } catch (err) {
+      if (!isAlreadyExists(err) || attempt >= ID_TRIES) throw err;
+      record.id = freshId(record);
+      record.photoUrl = null;
+    }
   }
-  await putJson(recordKey(record.id), record, true);
-  remember(record);
-  return record;
 }
 
+// The ticket photo gets a random suffix (the record carries the absolute URL), so an
+// orphaned tickets/<id>.jpg from the old design never blocks a real attach. The record put
+// is the guard: `ifMatch` with the ETag the record was read under, or `allowOverwrite:
+// false` when no override exists yet (seed record). Either failing means someone else
+// attached first: TICKET_CONFLICT, which the handler answers with 409.
 async function blobPutTicket(id, fields, jpegBuffer) {
-  const current = await blobGetRecord(id);
-  if (!current) return null;
-  // Ticket photos are never overwritten: if two instances race past the 409 guard inside
-  // the CDN window, the second put throws here and the record keeps the first ticket.
-  const { put } = await blobClient();
-  const { url } = await put(`collected/tickets/${id}.jpg`, jpegBuffer, {
+  const client = await blobClient();
+  const got = await readRecord(id);
+  if (!got) return null;
+  let { record: current, etag, source } = got;
+
+  let guard;
+  if (source === 'seed') {
+    guard = { allowOverwrite: false };
+  } else {
+    if (!etag) {
+      // Fallback case: the copy came from this instance's `recent` overlay with no ETag
+      // on the put result, or the blob response carried no ETag header. Ask the origin.
+      const fresh = await fetchJson(`${blobBase}/${recordKey(id)}`, true);
+      if (fresh) {
+        current = fresh.json;
+        etag = fresh.etag;
+        if (!etag && client.head) {
+          try {
+            etag = (await client.head(`${blobBase}/${recordKey(id)}`)).etag || null;
+          } catch {
+            etag = null;
+          }
+        }
+      }
+    }
+    if (current.ticket) throw conflict();
+    if (etag) {
+      guard = { ifMatch: etag };
+    } else {
+      // No ETag obtainable anywhere: the origin guard cannot be applied. Fall back to the
+      // handler's check alone and say so loudly; see the report's residual window.
+      console.error(`ticket attach on ${id}: no ETag available, writing without ifMatch`);
+      guard = { allowOverwrite: true };
+    }
+  }
+
+  const { url } = await client.put(`collected/tickets/${id}.jpg`, jpegBuffer, {
     access: 'public',
-    addRandomSuffix: false,
+    addRandomSuffix: true,
     contentType: 'image/jpeg',
   });
   rememberBase(url);
   const record = { ...current, ticket: { photoUrl: url, ...fields } };
-  await putJson(recordKey(id), record, true);
-  remember(record);
+  let result;
+  try {
+    result = await putJson(recordKey(id), record, guard);
+  } catch (err) {
+    if (isPreconditionFailed(err, client) || isAlreadyExists(err)) throw conflict();
+    throw err;
+  }
+  remember(record, result.etag);
   return record;
 }
 
@@ -355,6 +465,9 @@ async function blobPutTicket(id, fields, jpegBuffer) {
 // blob already exists) counts as "seed exists". Then the one-time migration runs.
 async function blobEnsureSeeded() {
   if (!seedPromise) {
+    // A check that just failed is not retried for SEED_RETRY_MS; requests in that window
+    // get the same error straight back instead of hammering a store that is down.
+    if (seedLastError && Date.now() - seedFailedAt < SEED_RETRY_MS) throw seedLastError;
     seedPromise = (async () => {
       const listed = await listAll(SEED_KEY);
       let exists = listed.some((b) => b.pathname === SEED_KEY);
@@ -366,24 +479,27 @@ async function blobEnsureSeeded() {
         if (blobs && blobs.length) rememberBase(blobs[0].url);
       }
       if (!exists && blobBase) {
-        const seed = await fetchJson(`${blobBase}/${SEED_KEY}`, true);
-        if (seed && Array.isArray(seed.records)) {
-          seedCache = seed.records;
+        const got = await fetchJson(`${blobBase}/${SEED_KEY}`, true);
+        if (got && Array.isArray(got.json.records)) {
+          seedCache = got.json.records;
           exists = true;
         }
       }
       if (!exists) {
         const records = generateSeedRecords(generateSchedule(), Date.now());
         try {
-          await putJson(SEED_KEY, { seedVersion: SEED_VERSION, records }, false);
+          await putJson(SEED_KEY, { seedVersion: SEED_VERSION, records }, { allowOverwrite: false });
           seedCache = records;
         } catch (err) {
           if (!isAlreadyExists(err)) throw err;
         }
       }
       await blobMigrate();
+      seedLastError = null;
     })().catch((err) => {
-      seedPromise = null; // next request retries from the top
+      seedPromise = null; // next request (after the backoff) retries from the top
+      seedFailedAt = Date.now();
+      seedLastError = err;
       throw err;
     });
   }
@@ -417,7 +533,7 @@ async function blobMigrate() {
       return;
     }
     try {
-      await putJson(recordKey(record.id), record, false);
+      await putJson(recordKey(record.id), record, { allowOverwrite: false });
     } catch (err) {
       if (!isAlreadyExists(err)) throw err;
     }
@@ -429,7 +545,8 @@ async function blobMigrate() {
   // to nothing if none is readable. A 5xx still throws.
   let index = null;
   for (const b of indexes.slice().sort((a, c) => extractTs(c.pathname) - extractTs(a.pathname))) {
-    index = normalizeIndex(await fetchJson(b.url, true));
+    const got = await fetchJson(b.url, true);
+    index = got ? normalizeIndex(got.json) : null;
     if (index) break;
   }
   for (const r of index ? index.records : []) {

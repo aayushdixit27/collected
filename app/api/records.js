@@ -2,7 +2,7 @@
 // POST /api/records -> { id, url } 201, or 400 on validation failure.
 // 503 { error } when storage cannot be read or written; nothing is reseeded on the way.
 import { listRecords, putRecord, ensureSeeded } from '../lib/store.js';
-import { makeId } from '../lib/ids.js';
+import { datePrefix, randomSuffix } from '../lib/ids.js';
 
 const STATUSES = ['collected', 'delivered', 'removed', 'not_collected'];
 const REASONS = ['blocked_access', 'overfilled', 'contaminated', 'not_out'];
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     await handle(req, res);
   } catch (err) {
     console.error('storage error:', err);
-    sendJson(res, 503, { error: 'storage unavailable', detail: String(err && err.message) });
+    sendJson(res, 503, { error: 'storage unavailable' });
   }
 }
 
@@ -90,7 +90,9 @@ async function handle(req, res) {
     const capturedAtIso =
       capturedAt && !Number.isNaN(Date.parse(capturedAt)) ? new Date(capturedAt).toISOString() : new Date().toISOString();
 
-    const id = await makeId(capturedAtIso, listRecords);
+    // No collision scan of the whole store per POST any more: the store's putRecord
+    // refuses to overwrite an existing id at the origin and regenerates on collision.
+    const id = `${datePrefix(capturedAtIso)}-${randomSuffix()}`;
 
     const record = {
       id,

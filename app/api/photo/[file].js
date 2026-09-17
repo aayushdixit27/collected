@@ -8,8 +8,9 @@ import { renderPhotoSvg } from '../../lib/svgphoto.js';
 const DATA_DIR = process.env.COLLECTED_DATA_DIR || path.join(process.cwd(), '.data');
 
 export default async function handler(req, res) {
-  // Round 3: every GET is no-store, images included. A record can be overwritten (ticket
-  // attach, migration), so nothing rendered from one is allowed to outlive it in a cache.
+  // Default no-store: a 404 must never stick (a seed record can gain a ticket later). The
+  // 200 image paths below override it with immutable, since an image is keyed by an id
+  // and rendered from data that does not change once it exists.
   res.setHeader('Cache-Control', 'no-store');
   try {
     await handle(req, res);
@@ -17,7 +18,7 @@ export default async function handler(req, res) {
     console.error('storage error:', err);
     res.statusCode = 503;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'storage unavailable', detail: String(err && err.message) }));
+    res.end(JSON.stringify({ error: 'storage unavailable' }));
   }
 }
 
@@ -40,6 +41,7 @@ async function handle(req, res) {
     const svg = renderPhotoSvg(record);
     res.statusCode = 200;
     res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.end(svg);
     return;
   }
@@ -55,7 +57,8 @@ async function handle(req, res) {
       const buf = await fs.readFile(path.join(DATA_DIR, 'photos', `${id}.jpg`));
       res.statusCode = 200;
       res.setHeader('Content-Type', 'image/jpeg');
-        res.end(buf);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.end(buf);
     } catch {
       res.statusCode = 404;
       res.setHeader('Content-Type', 'application/json');

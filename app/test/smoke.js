@@ -249,8 +249,14 @@ async function testBlobBackend() {
       ok(fake.keys('collected/photos/').length === 6 && fake.keys('collected/tickets/').length === 6, 'blob: six photo blobs and six ticket blobs');
       ok(fake.keys('collected/index-').length === 0, 'blob: no index-*.json is ever written');
       const recPuts = fake.puts.filter((p) => p.pathname.startsWith('collected/records/'));
-      ok(recPuts.every((p) => p.options.allowOverwrite === true && p.options.addRandomSuffix === false && p.options.cacheControlMaxAge === 60), 'blob: every records/ put uses addRandomSuffix:false, allowOverwrite:true, cacheControlMaxAge 60');
+      ok(recPuts.every((p) => p.options.addRandomSuffix === false && p.options.cacheControlMaxAge === 60), 'blob: every records/ put uses addRandomSuffix:false and cacheControlMaxAge 60');
       ok(recPuts.length === 12, `blob: 12 records/ puts for 6 creates + 6 tickets (got ${recPuts.length})`);
+      const createPuts = recPuts.filter((p) => p.options.ifMatch === undefined);
+      const ticketPuts = recPuts.filter((p) => p.options.ifMatch !== undefined);
+      ok(createPuts.length === 6 && createPuts.every((p) => p.options.allowOverwrite === false), 'blob: the 6 create puts use allowOverwrite:false (a duplicate id can never overwrite a record)');
+      ok(ticketPuts.length === 6 && ticketPuts.every((p) => typeof p.options.ifMatch === 'string' && p.options.ifMatch.length > 0), 'blob: the 6 ticket puts are guarded with ifMatch: <etag read>');
+      ok(fake.keys('collected/tickets/').every((k) => /^collected\/tickets\/[^/]+-[a-z0-9]+\.jpg$/.test(k)), 'blob: ticket JPEGs are stored with a random suffix');
+      ok(ids.every((id) => /\/collected\/tickets\/.+-[a-z0-9]+\.jpg$/.test(fake.readJson(`collected/records/${id}.json`).ticket.photoUrl)), 'blob: each record carries the absolute suffixed ticket URL');
 
       // Read-by-id from a cold instance: nothing in memory, so this is the deterministic-URL fetch.
       coldStart(fake);
@@ -266,6 +272,8 @@ async function testBlobBackend() {
       ok(seedTicket.status === 200, `blob: ticket on a seed record returns 200 (got ${seedTicket.status})`);
       const override = fake.readJson(`collected/records/${seedRec.id}.json`);
       ok(!!override && override.seed === true && override.ticket && override.ticket.netLb === 4100, 'blob: seed record with a ticket gets records/<id>.json with seed:true kept and the ticket');
+      const overridePut = fake.puts.find((p) => p.pathname === `collected/records/${seedRec.id}.json`);
+      ok(overridePut && overridePut.options.allowOverwrite === false && overridePut.options.ifMatch === undefined, "blob: a seed record's first override is put with allowOverwrite:false (no ETag exists yet)");
       ok(seedPuts(fake).length === 1, 'blob: attaching a ticket to a seed record does not rewrite the seed');
       coldStart(fake);
       const afterList = await (await fetch(`${base}/api/records`)).json();
@@ -275,6 +283,86 @@ async function testBlobBackend() {
       ok(second.status === 409, `blob: second ticket on the same record from a cold instance returns 409 (got ${second.status})`);
       const unknown = await fetch(`${base}/api/records/nope`);
       ok(unknown.status === 404, `blob: GET /api/records/nope returns 404 (got ${unknown.status})`);
+
+      // ETag race (finding 2a): freeze what fetch() serves for a record at its pre-ticket
+      // version. Attach #1 reads ETag e1, puts with ifMatch e1: ok. A cold instance then
+      // reads the same stale copy (no ticket, e1) so the handler's pre-check passes, but its
+      // put with ifMatch e1 hits the origin's e2 and is refused: 409, first ticket kept.
+      const raceRes = await postRecord(base, 41);
+      const race = await raceRes.json();
+      const raceKey = `collected/records/${race.id}.json`;
+      const e1 = fake.etagOf(raceKey);
+      fake.freezeFetch(raceKey);
+      const t1 = await postTicket(base, race.id, 7100);
+      ok(t1.status === 200, `blob race: first ticket attach returns 200 (got ${t1.status})`);
+      const e2 = fake.etagOf(raceKey);
+      ok(e1 && e2 && e1 !== e2, 'blob race: the ticket put produced a new ETag at the origin');
+      coldStart(fake);
+      const stale = await (await fetch(`${base}/api/records/${race.id}`)).json();
+      ok(stale.ticket === null, 'blob race: a cold instance reads the stale pre-ticket copy (frozen fetch)');
+      const t2 = await postTicket(base, race.id, 7200);
+      ok(t2.status === 409, `blob race: second attach with the stale ETag returns 409 (got ${t2.status})`);
+      ok((await t2.json()).error === 'ticket already recorded for this record', 'blob race: 409 body is the existing specific text');
+      const refusedRace = fake.puts.filter((p) => p.pathname === raceKey && p.ok === false);
+      ok(refusedRace.length === 1 && refusedRace[0].options.ifMatch === e1, 'blob race: exactly one put was refused, and it carried the stale ETag');
+      fake.unfreezeFetch(raceKey);
+      const kept = fake.readJson(raceKey);
+      ok(kept.ticket && kept.ticket.netLb === 7100 && fake.etagOf(raceKey) === e2, 'blob race: record keeps the first ticket and its ETag');
+
+      // Same race on a seed record: the override exists at the origin but a stale edge
+      // hides it, so the cold instance sees the seed row and puts with allowOverwrite:false.
+      const seedRec2 = firstData.records.find((r) => r.seed === true && r.status === 'collected' && !r.ticket && r.id !== seedRec.id);
+      const s1 = await postTicket(base, seedRec2.id, 4300);
+      ok(s1.status === 200, `blob race (seed): first attach on a seed record returns 200 (got ${s1.status})`);
+      fake.hiddenFromFetch.add(`collected/records/${seedRec2.id}.json`);
+      coldStart(fake);
+      const s2 = await postTicket(base, seedRec2.id, 4400);
+      ok(s2.status === 409, `blob race (seed): attach on a seed record whose override is hidden by a stale edge returns 409 (got ${s2.status})`);
+      fake.hiddenFromFetch.delete(`collected/records/${seedRec2.id}.json`);
+      ok(fake.readJson(`collected/records/${seedRec2.id}.json`).ticket.netLb === 4300, 'blob race (seed): the first ticket is kept');
+
+      // Duplicate id on create (finding 4): pin Math.random so the first generated suffix
+      // is '2222' and pre-seed that id. The photo put collides, the id is regenerated, and
+      // the pre-existing record is untouched. The fake counts calls so the stub is exact.
+      const capturedAt = '2026-09-17T18:00:00.000Z';
+      const dupId = '260917-2222';
+      const original = { id: dupId, address: 'Already here', status: 'collected', capturedAt, photoUrl: `${fake.base}/collected/photos/${dupId}.jpg`, seed: false };
+      fake.seed(`collected/records/${dupId}.json`, original);
+      fake.seed(`collected/photos/${dupId}.jpg`, Buffer.from(TINY_JPEG_B64, 'base64'), { contentType: 'image/jpeg' });
+      const realRandom = Math.random;
+      let zeros = 4;
+      Math.random = () => (zeros-- > 0 ? 0 : realRandom());
+      let dupRes;
+      try {
+        dupRes = await fetch(`${base}/api/records`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: '8 Collision Ct', status: 'collected', capturedAt, captureMs: 5000, photo: TINY_JPEG_B64 }),
+        });
+      } finally {
+        Math.random = realRandom;
+      }
+      const dup = await dupRes.json();
+      ok(dupRes.status === 201, `blob dup-id: create whose first id collides returns 201 (got ${dupRes.status})`);
+      ok(dup.id !== dupId && dup.id.startsWith('260917-'), `blob dup-id: the record got a regenerated id (${dup.id})`);
+      ok(JSON.stringify(fake.readJson(`collected/records/${dupId}.json`)) === JSON.stringify(original), 'blob dup-id: the pre-existing record is untouched');
+      ok(fake.puts.some((p) => p.pathname === `collected/photos/${dupId}.jpg` && p.ok === false), 'blob dup-id: the collision was refused at the photo put');
+      ok(!!fake.readJson(`collected/records/${dup.id}.json`), 'blob dup-id: the new record exists under the new id');
+      // Three collisions in a row give up with a 503 rather than overwriting.
+      let zeros3 = 12;
+      Math.random = () => (zeros3-- > 0 ? 0 : realRandom());
+      let exhaustRes;
+      try {
+        exhaustRes = await fetch(`${base}/api/records`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: '9 Collision Ct', status: 'collected', capturedAt, captureMs: 5000, photo: TINY_JPEG_B64 }),
+        });
+      } finally {
+        Math.random = realRandom;
+      }
+      ok(exhaustRes.status === 503, `blob dup-id: three collisions in a row return 503, never an overwrite (got ${exhaustRes.status})`);
+      ok(JSON.stringify(fake.readJson(`collected/records/${dupId}.json`)) === JSON.stringify(original), 'blob dup-id: still untouched after the exhausted retries');
     }
 
     // B. reseed on error is impossible. B1: list() throws on an empty store. B2: list works
@@ -291,7 +379,12 @@ async function testBlobBackend() {
       const r1c = await postRecord(base, 9);
       ok(r1c.status === 503, `blob B1: POST /api/records with list() failing returns 503 (got ${r1c.status})`);
       ok(fake.puts.length === 0 && fake.keys().length === 0, 'blob B1: nothing was written while storage was failing');
+      const body503 = await r1.json();
+      ok(JSON.stringify(Object.keys(body503)) === '["error"]' && body503.error === 'storage unavailable', `blob B1: 503 body carries only { error } (got ${JSON.stringify(body503)})`);
       fake.fail.list = false;
+      const r1x = await fetch(`${base}/api/records`);
+      ok(r1x.status === 503 && fake.puts.length === 0, `blob B1: inside the 1 s backoff the same error is returned without touching storage (got ${r1x.status})`);
+      await new Promise((r) => setTimeout(r, 1100));
       const r1d = await fetch(`${base}/api/records`);
       ok(r1d.status === 200 && seedPuts(fake).length === 1, `blob B1: once list() recovers the next request seeds normally (got ${r1d.status}, seed puts ${seedPuts(fake).length})`);
     }
@@ -304,6 +397,7 @@ async function testBlobBackend() {
       ok(r2.status === 503, `blob B2: seed listed but unreadable (fetch 5xx) returns 503 (got ${r2.status})`);
       ok(fake.puts.length === 0, 'blob B2: an unreadable seed is never rewritten');
       fake.fail.fetch = false;
+      await new Promise((r) => setTimeout(r, 1100));
       const r2b = await (await fetch(`${base}/api/records`)).json();
       ok(r2b.records.length === 1 && r2b.records[0].id === 'seed-x' && fake.puts.length === 0, 'blob B2: after the fetch recovers the existing seed is served, still with no writes');
     }
@@ -402,14 +496,14 @@ async function testBlobBackend() {
       ok(fake.puts.length === putsBefore, 'blob C: a cold start re-checks and finds nothing left to migrate');
 
       // An orphaned ticket JPEG (the index lost the ticket fields, the photo survived) is
-      // left alone by the migration, and re-attaching a ticket to that record is refused
-      // (503) because ticket photos are never overwritten. Pinned here so the limitation is
-      // visible: production has two such JPEGs tonight and they need a decision, not a
-      // silent overwrite.
+      // left alone by the migration. Re-attaching a ticket to that record succeeds: the
+      // new JPEG gets a random suffix and the record carries that URL; the orphan stays.
       ok(fake.readJson('collected/records/260916-real.json').ticket === null, 'blob C: an orphaned ticket JPEG does not invent ticket fields on the record');
       const reattach = await postTicket(base, '260916-real', 5100);
-      ok(reattach.status === 503, `blob C: re-attaching a ticket where tickets/<id>.jpg already exists is refused with 503, not overwritten (got ${reattach.status})`);
-      ok(fake.readJson('collected/records/260916-real.json').ticket === null, 'blob C: the refused re-attach wrote nothing to the record');
+      ok(reattach.status === 200, `blob C: re-attaching a ticket where an orphan tickets/<id>.jpg exists succeeds (got ${reattach.status})`);
+      const reattached = fake.readJson('collected/records/260916-real.json');
+      ok(reattached.ticket && reattached.ticket.netLb === 5100 && /\/collected\/tickets\/260916-real-[a-z0-9]+\.jpg$/.test(reattached.ticket.photoUrl), `blob C: record.ticket.photoUrl is a new suffixed URL (got ${reattached.ticket && reattached.ticket.photoUrl})`);
+      ok(fake.blobs.has('collected/tickets/260916-real.jpg') && fake.keys('collected/tickets/260916-real').length === 2, 'blob C: the orphan JPEG is untouched beside the new one');
 
       // No-clobber: attach a ticket to a migrated record, then hide its records/ blob from
       // list() and fetch() (lag) and cold start. The migration must not overwrite it.
@@ -670,11 +764,22 @@ async function main() {
     });
     ok(unknownTicketRes.status === 404, `POST /api/records/nope/ticket returns 404 (got ${unknownTicketRes.status})`);
 
-    // 17. no-store on every GET
-    for (const p of ['/api/records', `/api/records/${freshRecord.id}`, `/api/photo/${seedRecord.id}.svg`, `/api/ticket/${freshRecord.id}.jpg`, '/api/schedule']) {
+    // 17. caching: JSON routes no-store; image 200s immutable; image 404s no-store (a seed
+    //     record can gain a ticket later, so a cached 404 must never stick); schedule 5 min.
+    for (const p of ['/api/records', `/api/records/${freshRecord.id}`, '/api/records/nope']) {
       const r = await fetch(`${base}${p}`);
       ok(r.headers.get('cache-control') === 'no-store', `GET ${p} sends Cache-Control: no-store (got ${r.headers.get('cache-control')})`);
     }
+    for (const p of [`/api/photo/${seedRecord.id}.svg`, `/api/photo/${freshRecord.id}.jpg`, `/api/ticket/${freshRecord.id}.jpg`, `/api/ticket/${freshRecord.id}.svg`]) {
+      const r = await fetch(`${base}${p}`);
+      ok(r.status === 200 && r.headers.get('cache-control') === 'public, max-age=31536000, immutable', `GET ${p} 200 is immutable (got ${r.status} ${r.headers.get('cache-control')})`);
+    }
+    for (const p of [`/api/ticket/${freshRecord2.id}.svg`, '/api/photo/nope.jpg', '/api/photo/nope.svg', '/api/ticket/nope.svg', `/api/ticket/${freshRecord2.id}.jpg`]) {
+      const r = await fetch(`${base}${p}`);
+      ok(r.status === 404 && r.headers.get('cache-control') === 'no-store', `GET ${p} 404 is no-store (got ${r.status} ${r.headers.get('cache-control')})`);
+    }
+    const schedR = await fetch(`${base}/api/schedule`);
+    ok(schedR.headers.get('cache-control') === 'public, max-age=300', `GET /api/schedule sends public, max-age=300 (got ${schedR.headers.get('cache-control')})`);
 
     // 18. concurrency on the local backend (single process, single file, lock in store.js)
     await testConcurrency(base, 'local');

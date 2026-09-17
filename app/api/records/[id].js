@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     console.error('storage error:', err);
     res.statusCode = 503;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'storage unavailable', detail: String(err && err.message) }));
+    res.end(JSON.stringify({ error: 'storage unavailable' }));
   }
 }
 

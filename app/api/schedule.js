@@ -15,6 +15,6 @@ export default async function handler(req, res) {
   if (!cached) cached = generateSchedule();
   res.statusCode = 200;
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Cache-Control', 'public, max-age=300');
   res.end(JSON.stringify({ stops: cached }));
 }
