@@ -81,7 +81,7 @@ dollar figure for lost business exists anywhere.
 **The product is the ticket, tied; the pickup photo is the input.**
 
 1. **Pickup** — tap the stop, take the photo, save. Address, container, timestamp and GPS
-   attach automatically; over ten seconds and it produces nothing. TrashLab's driver app
+   attach automatically; past ten seconds a driver stops doing it. TrashLab's driver app
    does this; it is here because the ticket needs a pull to land on.
 2. **Ticket** — at the scale, "awaiting a scale ticket" lists today's pulls without one. Tap
    it, photograph the paper ticket, type the net weight, save. One photo, one number; where
