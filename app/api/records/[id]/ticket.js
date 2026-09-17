@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     await handle(req, res);
   } catch (err) {
     if (err && err.code === TICKET_CONFLICT) {
-      // Lost the race at the origin (ETag mismatch / override already written): same
+      // Lost the race at the origin (the write-once ticket file already exists): same
       // answer as the pre-check above.
       sendJson(res, 409, { error: 'ticket already recorded for this record' });
       return;
