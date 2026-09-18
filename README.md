@@ -224,6 +224,6 @@ per stop and date. Both are in the decision log.
 ---
 
 *Built as a take-home. The brief was to build something I had always wanted to build; this
-isn't that, and I'd rather say so than pretend. It is what I found when I went looking for a
-problem worth the hours in an industry I don't come from, and it held me because the failure
-underneath is an addressability failure, the kind I keep coming back to.*
+isn't that. It is what I found when I went looking for a
+problem worth the hours in an industry I'm not familiar with, and it held me because the failure
+underneath is an addressability failure, the kind I keep encountering in my work.*
