@@ -591,7 +591,23 @@
     });
     reasonRow.classList.toggle('hidden', state.status !== 'not_collected');
     if (state.status !== 'not_collected') state.reason = null;
+    applyTicketEligibility();
   });
+  // A delivery or a pull that could not happen has no weight, and the API refuses a ticket
+  // on it. Say so here, before Save, instead of after it.
+  function applyTicketEligibility() {
+    const eligible = state.status === 'collected' || state.status === 'removed';
+    el('ticketNa').classList.toggle('hidden', eligible);
+    ticketSlotWrap.classList.toggle('hidden', !eligible);
+    if (!eligible) {
+      if (state.ticketPhotoBlob) resetTicketPhoto();
+      weightBlock.classList.add('hidden');
+      moreToggleWrap.classList.add('hidden');
+      moreBlock.classList.add('hidden');
+      ticketHint.classList.add('hidden');
+    }
+    updateSaveEnabled();
+  }
   reasonRow.addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-reason]');
     if (!btn) return;

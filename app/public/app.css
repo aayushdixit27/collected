@@ -329,3 +329,4 @@ select.field { color: var(--text); }
 
 /* Ticket screen header: title group plus a Back close button, picker-close pattern. */
 .cap-top-title { display: flex; align-items: baseline; justify-content: space-between; flex: 1; min-width: 0; gap: 8px; }
+.ticket-na { color: var(--text-dim); font-size: 17px; margin: 0 20px 12px; }
