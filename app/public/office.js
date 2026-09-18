@@ -65,7 +65,8 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  function matchesFilters(r) {
+  // Query and date range only — the North Star card uses this without the status filter.
+  function matchesRange(r) {
     const q = qInput.value.trim().toLowerCase();
     if (q) {
       const hay = `${r.address} ${r.container || ''}`.toLowerCase();
@@ -76,6 +77,11 @@
     const d = dateOnly(r.capturedAt);
     if (from && d < from) return false;
     if (to && d > to) return false;
+    return true;
+  }
+
+  function matchesFilters(r) {
+    if (!matchesRange(r)) return false;
     const status = statusSelect.value;
     if (status === 'missing_ticket') {
       if (!missingTicket(r)) return false;
@@ -143,12 +149,13 @@
     if (from && to) parts.push(`${fromLabel} – ${toLabel}`);
     el('summaryLine').textContent = parts.join(' · ');
 
-    // North Star: share of collected roll-off pulls (in the filtered set — query, dates and
-    // status filter all apply) that go out with a ticket tied to the container.
-    const eligible = filtered.filter((r) => r.status === 'collected' && r.container && r.container.startsWith('RO-'));
+    // North Star: share of collected roll-off pulls in the query/date range that go out with a
+    // ticket tied to the container. Ignores the status filter on purpose — a "Ticket missing"
+    // view would otherwise read 0% and say nothing.
+    const eligible = allRecords.filter((r) => matchesRange(r) && r.status === 'collected' && r.container && r.container.startsWith('RO-'));
     const withTicket = eligible.filter((r) => !!r.ticket);
     el('statTicketed').textContent = eligible.length === 0 ? '—' : `${Math.round((100 * withTicket.length) / eligible.length)}%`;
-    el('statTicketedSub').textContent = eligible.length === 0 ? '' : `${withTicket.length} of ${eligible.length} collected roll-off pulls`;
+    el('statTicketedSub').textContent = eligible.length === 0 ? '' : `${withTicket.length} of ${eligible.length} collected roll-off pulls in range`;
 
     const cov = computeCoverage(from, to, statusSelect.value);
     el('statCoverage').textContent = cov.pct === null ? '—' : `${cov.pct}%`;
