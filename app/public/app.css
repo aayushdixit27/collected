@@ -68,32 +68,6 @@ a { color: var(--royal); }
 
 .hidden { display: none !important; }
 
-.confirm {
-  text-align: center;
-  padding-top: 40px;
-}
-.confirm .check {
-  font-size: 56px;
-  color: var(--green);
-  margin-bottom: 8px;
-}
-.confirm .elapsed {
-  font-size: 26px;
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-.confirm .url {
-  font-size: 13px;
-  color: var(--text-dim);
-  word-break: break-all;
-  margin-bottom: 16px;
-}
-.confirm .btn-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 /* Pill shape shared by office status badges; colour pairs are set below with the
    rest of the office rules. (Deleted here: retrieved-badge, photo-full, record-dl,
    #map, footer-note, proof-actions, not-found — proof-page-only classes; p.html
@@ -125,23 +99,6 @@ a { color: var(--royal); }
   margin-bottom: 12px;
 }
 
-.stat-strip {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.stat-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px;
-  text-align: center;
-}
-.stat-card .num { font-size: 20px; font-weight: 700; }
-.stat-card .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
-.stat-card .sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-
 .result-row {
   display: flex;
   gap: 12px;
@@ -172,7 +129,7 @@ a { color: var(--royal); }
   color: var(--text);
   font-size: 14px;
 }
-@media (max-width: 640px) { .result-address { font-size: 17px; } }
+@media (max-width: 640px) { .result-address { font-size: 17px; } .stat-strip { grid-template-columns: 1fr 1fr; } .stat-card.north { grid-column: 1 / -1; } }
 
 @media (min-width: 640px) {
   .office-controls { grid-template-columns: 2fr 1fr 1fr 1fr; }
@@ -245,7 +202,7 @@ input::placeholder { color: var(--placeholder); opacity: 1; }
 .segctl { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; margin: 6px 20px 0; }
 .segctl button { flex: 1; font: inherit; font-size: 15px; font-weight: 700; color: var(--text-dim); background: transparent; border: 0; border-radius: 7px; padding: 11px 0; min-height: 48px; cursor: pointer; }
 .segctl button.on { background: var(--navy); color: #fff; box-shadow: none; }
-.reasons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.reasons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 20px 0; }
 .reasons button { font: inherit; font-size: 15px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; min-height: 48px; cursor: pointer; }
 .reasons button.on { background: var(--surface-2); box-shadow: inset 0 0 0 2px var(--navy); }
 
@@ -260,15 +217,16 @@ input::placeholder { color: var(--placeholder); opacity: 1; }
 }
 .save:disabled { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); cursor: not-allowed; }
 .save:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.btn-secondary:focus-visible, .picker-close:focus-visible, .picker-item:focus-visible, .awaiting-row:focus-visible, .segctl button:focus-visible, .reasons button:focus-visible, .note-toggle:focus-visible, .retake:focus-visible, .result-row:focus-visible, .footer-link:focus-visible, select.field:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 /* Saved */
 .confirm { padding: 48px 16px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
-.confirm .check { width: 64px; height: 64px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); display: grid; place-items: center; color: var(--royal); }
+.confirm .check { width: 64px; height: 64px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); display: grid; place-items: center; color: var(--royal); margin-bottom: 8px; }
 .confirm .check svg { width: 36px; height: 36px; color: var(--royal); }
-.confirm .elapsed { font-size: 32px; font-weight: 700; letter-spacing: -.01em; margin-top: 6px; color: var(--text); }
+.confirm .elapsed { font-size: 32px; font-weight: 700; letter-spacing: -.01em; margin-top: 6px; margin-bottom: 4px; color: var(--text); }
 .saved-stop { color: var(--text-dim); font-size: 17px; }
-.confirm .url { font-family: var(--mono); font-size: 15px; color: var(--text); word-break: break-all; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 6px; }
-.confirm .btn-row { display: flex; gap: 8px; width: 100%; margin-top: 8px; }
+.confirm .url { font-family: var(--mono); font-size: 17px; color: var(--text); word-break: break-all; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 6px; margin-bottom: 16px; }
+.confirm .btn-row { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 8px; }
 .confirm .btn-row button { flex: 1; }
 .confirm .save { margin-top: 12px; }
 .confirm .footer-link { margin-top: 16px; }
@@ -285,7 +243,7 @@ input::placeholder { color: var(--placeholder); opacity: 1; }
 .picker-item.current { box-shadow: inset 0 0 0 2px var(--navy); }
 .picker-item.free { color: var(--text); font-weight: 600; }
 .picker-item .pi-addr { font-size: 17px; font-weight: 600; }
-.picker-item .pi-meta { font-size: 15px; color: var(--text-dim); font-family: var(--mono); margin-top: 2px; }
+.picker-item .pi-meta { font-size: 17px; color: var(--text-dim); font-family: var(--mono); margin-top: 2px; }
 .picker-item .pi-done { position: absolute; right: 12px; top: 12px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-text); background: var(--green); border-radius: 999px; padding: 3px 8px; }
 .picker-empty { color: var(--text-dim); font-size: 15px; padding: 8px 0; }
 input[type="search"] { -webkit-appearance: none; appearance: none; }
@@ -293,14 +251,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 /* Office, same language as capture */
 .office-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0 12px; flex-wrap: wrap; }
 .office-top .cap-day { font-size: 15px; }
-.stat-strip { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
+.stat-strip { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
 .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; text-align: left; }
 .stat-card .num { font-size: 26px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
 .stat-card.north { border-color: var(--mid); }
 .stat-card.north .num { font-size: 34px; color: var(--navy); }
 .stat-card .label { font-size: 14px; color: var(--text-dim); text-transform: none; letter-spacing: 0; margin-top: 2px; font-weight: 500; }
 .stat-card .sub { font-size: 14px; color: var(--text-dim); margin-top: 4px; }
-@media (max-width: 640px) { .stat-strip { grid-template-columns: 1fr 1fr; } .stat-card.north { grid-column: 1 / -1; } }
 select.field { color: var(--text); }
 
 .no-ticket { color: var(--red); white-space: nowrap; }
@@ -337,7 +294,7 @@ select.field { color: var(--text); }
 .slot-label svg { width: 32px; height: 32px; color: var(--text-dim); flex-shrink: 0; }
 .slot-label .txt { display: flex; flex-direction: column; gap: 3px; }
 .slot-label .t { font-size: 17px; font-weight: 600; }
-.slot-label .s, .slot-label .alt { font-size: 15px; color: var(--text-dim); }
+.slot-label .s, .slot-label .alt { font-size: 17px; color: var(--text-dim); }
 .slot-label .alt { text-decoration: underline; margin-top: 2px; }
 .slot-label input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .sr-only-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
@@ -351,7 +308,7 @@ select.field { color: var(--text); }
 .saved-slots .dim { color: var(--text-dim); font-weight: 600; }
 /* "Add the net weight to attach the ticket" — dim, not red; appears the moment
    a ticket photo is in and the field is empty. */
-.ticket-hint { color: var(--text-dim); font-size: 15px; margin: 8px 20px 0; }
+.ticket-hint { color: var(--text-dim); font-size: 17px; margin: 8px 20px 0; }
 
 /* Pulls awaiting a scale ticket: a card, same language as the stop card below it. */
 .awaiting-row {
