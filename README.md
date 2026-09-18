@@ -43,8 +43,7 @@ The mechanism explains why the obvious fixes miss.
 
 Step five is the whole problem. Today it travels by crumpled cab, photo in a group chat, or
 re-typing on a Friday. **The bill is late because the paper is slow**, and when it reaches
-the customer it carries a weight and nothing else. Of the nine parts of a service event,
-**only the scale produces a durable artifact**, and it is addressed to nobody.
+the customer it carries a weight and nothing else. Of everything that happens between delivery and invoice, **only the scale produces a durable artifact**, and it is addressed to nobody.
 
 ## The crux
 
@@ -96,7 +95,7 @@ dollar figure for lost business exists anywhere.
 **The product is the ticket, tied; the pickup photo is the input.**
 
 1. **Pickup** — tap the stop, take the photo, save. Address, container, timestamp and GPS
-   attach automatically; past ten seconds a driver stops doing it. TrashLab's driver app
+   attach automatically; the ten-second budget is my assumption, untested with a driver. TrashLab's driver app
    does this; it is here because the ticket needs a pull to land on.
 2. **Ticket** — at the scale, "awaiting a scale ticket" lists today's pulls without one. Tap
    it, photograph the paper ticket, type the net weight, save. One photo, one number; where
@@ -147,13 +146,14 @@ ticket step under 20 s (one photo, one number); tickets tied per pull; the custo
 under 30 s from address and date. **Reported beside it, not steered:** disputes closed with
 evidence and refunds avoided, count and dollars.
 
-**The office strip still shows the previous North Star** — share of scheduled stops with a
-record. It measured the pickup, which TrashLab measures itself; superseded, not wrong, and
-the ticket figure is the next build. Read from the live API on 17 September 2026: **91 %
-(242 of 265 scheduled stops on recorded days), 7.7 s median capture, 253 records** — seeded
-data plus two real captures, so the instrument, not a field result.
+**The office does not yet compute the North Star.** It shows pickup coverage, read from the
+live API on 17 September 2026: **91 % (242 of 265 scheduled stops on recorded days), 7.7 s
+median capture, 253 records** — seeded data plus one real capture (the first-time user's;
+earlier phone captures were lost in the storage incident). It shows the instrument working,
+not a field result. The first build after submission is a tickets-tied-per-billed-overage
+strip.
 
-Timings, honestly labelled:
+Timings:
 
 | Run | Capture | Retrieve |
 |---|---|---|
@@ -169,7 +169,7 @@ The phone numbers matter most, because the product rests on a driver doing this 
 a day, now twice per pull. The last row is the one to read: a product executive who had
 never seen the screen, given only the link, recorded a pull and tied a ticket to it in 63
 seconds against a 30-second budget, and left gross, tare and facility empty — which is what
-"one photo, one number" predicts. Over target by 2×; not hidden.
+"one photo, one number" predicts. Over target by 2×.
 
 **The one thing this will not trade:** capture speed. Pickup under ten seconds, ticket one
 photo and one number; a field that pushes either past its budget loses.
@@ -181,8 +181,7 @@ plan, non-goals) was written before any code. Three Claude Code lanes then built
 one contract in parallel on separate worktrees — data and API, driver and office screens,
 customer page — each with an independent reviewer its work had to pass before merge. The
 merged diff went to a fresh-context review, which found five defects: three fixed before
-deploy, two logged below. 185 tests pass. Every commit is on `main`, so the sequence can be
-checked rather than believed.
+deploy, two logged below. 185 tests pass. Commits are on `main`; the repo goes public at submission, so the sequence can be checked.
 
 Then it broke in front of someone. In a live demo at 15:00 the store lost five real records:
 records lived in one JSON file on Vercel Blob, every write re-read and rewrote it, and Blob's
