@@ -143,9 +143,21 @@
     if (from && to) parts.push(`${fromLabel} – ${toLabel}`);
     el('summaryLine').textContent = parts.join(' · ');
 
+    // North Star: share of collected roll-off pulls (in the filtered set — query, dates and
+    // status filter all apply) that go out with a ticket tied to the container.
+    const eligible = filtered.filter((r) => r.status === 'collected' && r.container && r.container.startsWith('RO-'));
+    const withTicket = eligible.filter((r) => !!r.ticket);
+    el('statTicketed').textContent = eligible.length === 0 ? '—' : `${Math.round((100 * withTicket.length) / eligible.length)}%`;
+    el('statTicketedSub').textContent = eligible.length === 0 ? '' : `${withTicket.length} of ${eligible.length} collected roll-off pulls`;
+
     const cov = computeCoverage(from, to, statusSelect.value);
     el('statCoverage').textContent = cov.pct === null ? '—' : `${cov.pct}%`;
-    el('statCoverageSub').textContent = cov.total ? `${cov.have} of ${cov.total} scheduled stops recorded` : '';
+    let covSub = cov.total ? `${cov.have} of ${cov.total} scheduled stops recorded` : '';
+    if (covSub && statusSelect.value) {
+      const opt = statusSelect.options[statusSelect.selectedIndex];
+      covSub += ` · ${opt.textContent} only`;
+    }
+    el('statCoverageSub').textContent = covSub;
 
     const secs = filtered.filter((r) => typeof r.captureMs === 'number').map((r) => r.captureMs / 1000);
     const med = median(secs);

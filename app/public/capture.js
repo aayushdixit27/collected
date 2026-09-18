@@ -167,7 +167,9 @@
       const parts = r.address.split(',');
       const rest = parts.slice(1).join(',').trim();
       b.querySelector('.pi-addr').textContent = parts[0].trim();
-      b.querySelector('.pi-meta').textContent = `${rest}${rest ? ' · ' : ''}${r.container || ''} · picked up ${formatTime(r.capturedAt)}`;
+      // Join only the non-empty parts, so a free-text record with no container never gets a dangling " · ".
+      const metaParts = [rest, r.container || '', `picked up ${formatTime(r.capturedAt)}`].filter(Boolean);
+      b.querySelector('.pi-meta').textContent = metaParts.join(' · ');
       b.addEventListener('click', () => {
         awaitingDialog.close();
         openAddLater(r, 'capture');
@@ -961,14 +963,19 @@
     const rest = parts.slice(1).join(',').trim();
     const meta = el('stopMetaStatic');
     meta.innerHTML = '';
-    if (rest) meta.append(rest);
+    // Only add a " · " before a part when something already precedes it, so a null
+    // container (free-text record) never leaves a dangling separator.
+    let hasPrev = false;
+    if (rest) { meta.append(rest); hasPrev = true; }
     if (record.container) {
-      if (rest) meta.append(' · ');
+      if (hasPrev) meta.append(' · ');
       const code = document.createElement('code');
       code.textContent = record.container;
       meta.appendChild(code);
+      hasPrev = true;
     }
-    meta.append(` · picked up ${formatTime(record.capturedAt)}`);
+    if (hasPrev) meta.append(' · ');
+    meta.append(`picked up ${formatTime(record.capturedAt)}`);
   }
 
   function renderLockedHero(record) {

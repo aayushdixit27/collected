@@ -250,15 +250,17 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 /* Office, same language as capture */
 .office-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0 12px; flex-wrap: wrap; }
 .office-top .cap-day { font-size: 15px; }
-.stat-strip { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.stat-strip { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
 .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; text-align: left; }
 .stat-card .num { font-size: 26px; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
 .stat-card.north { border-color: var(--mid); }
 .stat-card.north .num { font-size: 34px; color: var(--navy); }
 .stat-card .label { font-size: 14px; color: var(--text-dim); text-transform: none; letter-spacing: 0; margin-top: 2px; font-weight: 500; }
 .stat-card .sub { font-size: 14px; color: var(--text-dim); margin-top: 4px; }
-/* Phone: two columns, the North Star card spanning both. Must follow the base .stat-strip rule. */
-@media (max-width: 640px) { .result-address { font-size: 17px; } .stat-strip { grid-template-columns: 1fr 1fr; } .stat-card.north { grid-column: 1 / -1; } }
+/* Phone: two columns, the North Star card spanning both; the other three also span full
+   width and stack (chosen over a 2+1 row — see round-5 report). Must follow the base
+   .stat-strip rule. */
+@media (max-width: 640px) { .result-address { font-size: 17px; } .stat-strip { grid-template-columns: 1fr 1fr; } .stat-card { grid-column: 1 / -1; } }
 select.field { color: var(--text); }
 
 .no-ticket { color: var(--red); white-space: nowrap; }
