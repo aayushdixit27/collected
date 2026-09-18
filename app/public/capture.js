@@ -142,9 +142,12 @@
     return state.schedule.find((s) => s.address === address || (container && s.container === container));
   }
 
-  // ---- awaiting a scale ticket: today's collected/removed pulls with no ticket yet ----
+  // ---- awaiting a scale ticket: today's roll-off pulls (collected/removed) with no ticket yet.
+  // Front-load and cart stops are route service billed flat; they are not weighed per pull,
+  // so they never wait for a ticket. A hand-typed address (no container) still qualifies.
   function awaitingTickets() {
-    return state.todayRecords.filter((r) => (r.status === 'collected' || r.status === 'removed') && !r.ticket);
+    return state.todayRecords.filter((r) =>
+      (r.status === 'collected' || r.status === 'removed') && !r.ticket && (!r.container || /^RO-/i.test(r.container)));
   }
   function renderAwaiting() {
     if (state.mode !== 'capture') return;
