@@ -392,7 +392,8 @@
     try {
       blob = await downscaleImage(file, 1400, 0.72);
     } catch {
-      blob = file;
+      showError('Could not read that photo. Try another, or take one with the camera.');
+      return;
     }
     state.photoBlob = blob;
     renderPickupPhotoFromBlob(blob);
@@ -494,7 +495,10 @@
     try {
       blob = await downscaleImage(file, 1400, 0.72);
     } catch {
-      blob = file;
+      // HEIC on a browser that cannot decode it, or a non-image. Do not send it raw:
+      // the server would refuse it as not-a-JPEG after the driver has already tapped Save.
+      showError('Could not read that photo. Try another, or take one with the camera.');
+      return;
     }
     if (state.mode === 'addLater') laState.photoBlob = blob;
     else state.ticketPhotoBlob = blob;
@@ -607,7 +611,11 @@
     if (state.mode === 'addLater') {
       saveBtn.disabled = !(laState.photoBlob && validNet(netLbInput.value.trim()));
     } else {
-      saveBtn.disabled = !(state.photoBlob && state.address && state.address.trim());
+      const base = !!(state.photoBlob && state.address && state.address.trim());
+      // One photo, one number: a ticket photo without its weight is not a ticket, and
+      // deferring it silently is how a ticket "didn't upload".
+      const ticketOk = !state.ticketPhotoBlob || validNet(netLbInput.value.trim());
+      saveBtn.disabled = !(base && ticketOk);
     }
   }
 
