@@ -199,7 +199,10 @@ function noteFor(reason, rand) {
 // Generates records for every scheduled occurrence in the 45 days ending at seedTimeMs,
 // skipping ~8% at random (coverage gaps). Forces the 2026-08-12 1428 Mission College Blvd record.
 export function generateSeedRecords(schedule, seedTimeMs = Date.now(), seed = RECORD_SEED_BASE) {
-  const rand = mulberry32(seed);
+  // Every record's randomness is keyed by its stop and date, never by the position of the
+  // record in the run: the 45-day window slides every UTC midnight, and a stream PRNG would
+  // renumber every id (the pinned demo link included) each time it did.
+  let rand = mulberry32(seed);
   const records = [];
   const usedIds = new Set();
 
@@ -243,6 +246,7 @@ export function generateSeedRecords(schedule, seedTimeMs = Date.now(), seed = RE
         day.getUTCMonth() === 7 &&
         day.getUTCDate() === 12;
 
+      rand = mulberry32(hashStr(`${seed}|${stop.address}|${stop.container}|${day.toISOString().slice(0, 10)}`));
       const skip = !isPinned && rand() < 0.08;
       if (skip) return;
 
@@ -265,7 +269,8 @@ export function generateSeedRecords(schedule, seedTimeMs = Date.now(), seed = RE
         accuracyM: Math.round(5 + rand() * 20),
       };
       const note = isPinned ? null : noteFor(reason, rand);
-      const id = makeSeedId(capturedAt);
+      const id = isPinned ? '260812-nycx' : makeSeedId(capturedAt);
+      if (isPinned) usedIds.add(id);
 
       const record = {
         id,
