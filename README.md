@@ -146,12 +146,12 @@ ticket step under 20 s (one photo, one number); tickets tied per pull; the custo
 under 30 s from address and date. **Reported beside it, not steered:** disputes closed with
 evidence and refunds avoided, count and dollars.
 
-**The office does not yet compute the North Star.** It shows pickup coverage, read from the
-live API on 17 September 2026: **91 % (242 of 265 scheduled stops on recorded days), 7.7 s
-median capture, 253 records** — seeded data plus one real capture (the first-time user's;
-earlier phone captures were lost in the storage incident). It shows the instrument working,
-not a field result. The first build after submission is a tickets-tied-per-billed-overage
-strip.
+**The office computes it.** First card on the office view: share of collected roll-off
+pulls in range with a ticket tied — **81 % (79 of 97)** on the seed, read from the live
+deployment on 17 September 2026. Beside it, pickup coverage (91 %, 242 of 265 scheduled
+stops on recorded days), median capture and record count. Seeded data plus one real capture
+(the first-time user's; earlier phone captures were lost in the storage incident), so it
+shows the instrument working, not a field result.
 
 Timings:
 
