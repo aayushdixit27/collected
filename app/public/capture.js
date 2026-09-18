@@ -603,6 +603,7 @@
     ticketSlotWrap.classList.toggle('hidden', !eligible);
     if (!eligible) {
       if (state.ticketPhotoBlob) resetTicketPhoto();
+      resetWeightFields();
       weightBlock.classList.add('hidden');
       moreToggleWrap.classList.add('hidden');
       moreBlock.classList.add('hidden');
