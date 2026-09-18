@@ -238,7 +238,7 @@
     el('ddReceived').textContent = record.receivedAt;
 
     el('copyLinkBtn').addEventListener('click', () => {
-      navigator.clipboard?.writeText(location.origin + location.pathname);
+      navigator.clipboard?.writeText(location.origin + location.pathname).catch(() => {});
       el('copyLinkBtn').textContent = 'Copied';
       setTimeout(() => (el('copyLinkBtn').textContent = 'Copy link'), 1500);
     });
