@@ -4,48 +4,71 @@
 <style>
 :root{--paper:#fff;--ink:#141414;--ink2:#3d3d3d;--rule:#d6d2c9;--accent:#2F2A90}
 html{background:var(--paper)}body{margin:0;color:var(--ink);font:17px/1.5 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;max-width:680px;padding:36px 20px 64px;margin:0 auto}
-h1{font-size:30px;margin:0 0 2px;letter-spacing:-.01em}.tag{color:var(--ink2);margin:0 0 24px}
+h1{font-size:30px;margin:0 0 4px;letter-spacing:-.01em}.tag{color:var(--ink2);margin:0 0 20px;font-size:18px}
 h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin:28px 0 8px;border-top:1px solid var(--rule);padding-top:16px}
 p{margin:0 0 10px}.big{font-size:22px;line-height:1.3;font-weight:600;margin:4px 0 8px}
 blockquote{margin:10px 0;padding:8px 14px;border-left:3px solid var(--accent);color:var(--ink2);font-style:italic}
-ul{padding-left:20px;margin:0}li{margin:0 0 6px}
+ul,ol{padding-left:20px;margin:0}li{margin:0 0 6px}
 .receipt{font:15px ui-monospace,Menlo,monospace;background:#f1efe9;padding:12px 16px;border-radius:4px;margin:8px 0 10px;white-space:pre;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:16px;margin:6px 0 10px}td,th{text-align:left;padding:7px 8px;border-bottom:1px solid var(--rule);vertical-align:top}th{color:var(--ink2);font-weight:600;width:26%}
 .try{margin-top:24px;padding:20px;border:2px solid var(--accent);border-radius:6px}
 .try a{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:600;padding:12px 16px;border-radius:4px;margin:6px 6px 0 0}
 .try .big{color:var(--accent);margin-top:0}kbd{font:14px ui-monospace,Menlo,monospace;background:#f1efe9;padding:1px 5px;border-radius:3px}
 small{color:var(--ink2)}
 </style></head><body>
 <h1>Collected</h1>
-<p class="tag">The weight ticket, tied to your container. A two-hour take-home for a waste-hauling platform, and what it turned into.</p>
+<p class="tag">Proof of the weight. The scale ticket from the transfer station, tied to the customer's container, on one page with the pickup photo and the math.</p>
 
 <h2>The problem</h2>
 <p class="big">The record exists and cannot be tied to the customer.</p>
-<p>A roll-off hauler dumps at someone else's transfer station. The scale house prints a paper ticket — gross, tare, net — with no container and no customer on it. Three weeks later an overage charge lands. The customer asks for proof, gets that ticket, and cannot tell it was their load.</p>
-<blockquote>"The weight ticket provided did not have any identifying information that it belonged to our reserved container. I cannot confirm it was actually our ticket." — a customer, public review, August 2026</blockquote>
+<p>A roll-off hauler dumps at someone else's transfer station. The scale house prints a paper ticket with gross, tare and net on it, and no container and no customer. Three weeks later an overage charge lands. The customer asks for proof, gets that ticket, and cannot tell it was their load.</p>
+<blockquote>"The weight ticket provided did not have any identifying information that it belonged to our reserved container. I cannot confirm it was actually our ticket." — Trustpilot review, August 2026</blockquote>
 
-<h2>What it does</h2>
-<p>The stop is the record. The driver takes the pickup photo and, at the scale, the ticket photo plus one number — the net weight. The office finds any pull weeks later by address and date. The customer gets a page they can check:</p>
+<h2>The people</h2>
+<p>Dale runs four roll-off trucks. He does not own a scale, so his drivers dump across town and come back with a paper ticket. His flat rate includes one ton; anything over is billed at $95 a ton, from that paper, when it finally reaches the office.</p>
+<p>Renée is a contractor who rents twenty of Dale's boxes a year. On a Tuesday she gets an invoice for a pull from three weeks ago: $158.65 over. She asks for proof. Dale sends the ticket. It has a weight and a time and nothing that says it was her box. She does not think Dale is a crook. She just cannot check, and she has another hauler's number.</p>
+<p>With Collected the driver takes the pickup photo at Renée's site, and at the scale takes the ticket photo and types one number. Both land on the same record. The charge goes out with a link:</p>
 <div class="receipt">Pickup   1428 Mission College Blvd · RO-20-114 · Aug 12, 6:36 AM
 Ticket   Zanker Road Transfer Station · 7:41 AM (+64 min)
          Gross 19,860 lb   Tare 14,520 lb   Net 5,340 lb
 Charge   5,340 − 2,000 included = 3,340 lb over
          3,340 ÷ 2,000 × $95.00/ton = $158.65</div>
+<p>Renée can check it. Dale keeps the customer, and the $158.65. <small>(Composite; names invented.)</small></p>
+
+<h2>Who gets what</h2>
+<table>
+<tr><th>Driver</th><td>Two photos inside the work he already does, the box and the ticket. One photo, one number. Shows he did the job.</td></tr>
+<tr><th>The hauler</th><td>Bills the overage with proof attached, the day the ticket is printed. Fewer "is that my ticket?" calls, fewer refunds.</td></tr>
+<tr><th>The customer</th><td>Can check the charge in ten seconds. Pays what she owes, keeps the hauler she trusts.</td></tr>
+</table>
+
+<h2>How it is measured</h2>
+<p><strong>Share of billed overages that go out with a ticket tied to the container.</strong> Zero if the ticket was never photographed; zero if it was photographed and sits in a text thread. Inputs: ticket step under 20 seconds, tickets tied per pull, the customer's page found in under 30 seconds from an address and a date.</p>
+<p>In the hauler's terms: fewer ticket-mismatch complaints and fewer refund dollars, month over month. Say a hauler gets 100 disputed tickets a month and refunds half at $75 each. That is $3,750 a month. The number to watch is that one, before and after.</p>
 
 <h2>Three product decisions</h2>
 <ul>
-<li><strong>Retrieval, not capture.</strong> The platform's own driver app already photographs the pickup. The paper ticket from a third-party scale, tied to the container and shown to the customer with the arithmetic, is the part it doesn't hand over (one competitor does; the difference is the container link and the arithmetic).</li>
+<li><strong>The ticket, not the pickup photo.</strong> The platform's own driver app already photographs the pickup and ties it to the job. What it does not hand the customer is the third-party ticket with the container and the math. One competitor shows ticket images; the difference here is the container link and the arithmetic, at the cost of one photo and one number.</li>
+<li><strong>One record, two photos, one place.</strong> The stop is the object. Pickup and ticket are two slots on it, filled in the moment or later, through the same two taps. Attaching the ticket in a separate flow was tried on 17 September and failed in front of a user.</li>
 <li><strong>Never trade capture speed.</strong> Pickup under ten seconds; the ticket is one photo and one number. A field that improves the record but slows the driver loses.</li>
-<li><strong>Say what was not checked.</strong> No hauler has been spoken to. A first-time user on his own phone recorded a pull in 41 s and tied the ticket in 22 s — over the 30 s budget, and the only number that isn't mine. Storage was redesigned on 17 Sep after it lost records under two devices writing at once.</li>
 </ul>
 
 <div class="try">
-<p class="big">Try it — three screens, one record.</p>
+<p class="big">Try it. Three screens, one record.</p>
 <a href="/">Driver · record a pull</a>
 <a href="/office">Office · find it</a>
 <a href="/p/260812-nycx">Customer · the page</a>
-<p style="margin-top:12px"><small>Driver: pick any stop. One screen, two photo slots — pickup, then the scale ticket (<kbd>choose from library</kbd> works for both), type <kbd>5340</kbd> as the net weight, one Save. Copy the link and open it — that is what the customer sees. Then find your record in the office by address. Seeded data; photos labelled synthetic.</small></p>
+<p style="margin-top:12px"><small>Driver: pick any stop. Add a pickup photo, then a ticket photo (<kbd>choose from library</kbd> works for both), type <kbd>5340</kbd> as the net weight, Save. Copy the link and open it; that is what the customer sees. Then find your record in the office by address. Seeded data; generated photos are labelled.</small></p>
 </div>
 
-<h2>How it was built</h2>
-<p><small>Spec before code. Three parallel coding agents, each owning disjoint files, built the ticket feature from one contract in about an hour; each agent's work went through an independent reviewer, and a fresh-context review of the merged result found five defects before deploy. Their briefs, findings and reviews live in a shared <strong>Senso</strong> folder — the context layer the agents and I read and write, so a new session picks up the state without a transcript. The record store is Vercel Blob with write-once files; a real product would put records in Postgres and keep Blob for photos.</small></p>
+<h2>Next</h2>
+<ol>
+<li><strong>Read the ticket.</strong> Pull gross, tare, net and the facility off the photo, and name the transfer station from the GPS fix; the driver confirms one number instead of typing it.</li>
+<li><strong>The charge carries the page.</strong> Every overage line on the invoice gets the link automatically; an overage with no ticket tied is held.</li>
+<li><strong>Could-not-service notice.</strong> The same record, sent the same day a box is blocked, overfilled or not out.</li>
+</ol>
+
+<h2>How it was built, and what was not checked</h2>
+<p><small>Spec before code. Three coding agents built the ticket feature in parallel from one contract, each owning separate files, each reviewed independently; a fresh review of the merged result found five defects before deploy. Their briefs and findings live in a shared <strong>Senso</strong> folder, the context layer the agents and I both read and write, so a new session picks up the state without a transcript.</small></p>
+<p><small>Not checked: no hauler has been spoken to. A first-time user on his own phone recorded a pull in 41 seconds and tied the ticket in 22, against a 30-second budget. Records are files on Vercel Blob, written once; the store lost records on 17 September under two devices writing at once and was rebuilt that afternoon. A real product would keep records in Postgres and photos in Blob.</small></p>
 </body></html>
