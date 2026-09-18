@@ -16,13 +16,20 @@ The charge arrives three weeks late. You ask for proof. The proof proves nothing
 
 Public customer reviews of dumpster-rental companies, 2023 to 2026, describe the same
 sequence: an overage charge weeks after the pickup, a scale ticket produced on request, and
-nothing on it that says whose load it was — no container, no address, sometimes no tare. An
-earlier draft quoted two of those reviews; the quotes came out because I could not re-locate
-their sources, and go back in when I can.
+nothing on it that says whose load it was. Two of them, verbatim:
+
+> *"The weight ticket provided did not have any identifying information that it belonged to
+> our reserved container. I cannot confirm it was actually our ticket."*
+> — Trustpilot, Dumpster Rental Enterprises LLC, verified review, 13 August 2026
+
+> *"No tare weight for the truck and dumpster entering, no measured empty weight… All that
+> is listed is 'Inbound dirt by yard.'"*
+> — BBB complaint 24981374, Budget Dumpster, 25 June 2026; resolved with a $1,989 refund
 
 That is not "no record exists." **It is "the record exists and cannot be tied to me."** The
-customer cannot check it, so the customer assumes the worst. Until the sources are recovered
-this is a hypothesis, presented as one.
+customer cannot check it, so the customer assumes the worst. Two cases, both single
+customers; the quotes were pulled from a draft for a day while their sources were
+re-found, and went back in when they were.
 
 ## How the bill gets late
 
@@ -65,6 +72,14 @@ owns. What this adds is that third-party ticket, tied to the container when it i
 the customer's page with the arithmetic. Their page also lists "overweight loads" as a
 structured driver workflow; whether that covers a ticket photo is my first question for
 John.
+
+It is not nobody's. **Docket** documents a driver weight-ticket photo flow with field
+extraction and customer-visible ticket images on its client dashboard (support pages, read
+17 September 2026); ServiceCore can email job attachments with invoices; Hauler Hero,
+CurbWaste and Trash Flow tie ticket data to orders. So the honest claim is narrower:
+TrashLab does not show it doing this, at least one competitor does, and what this version
+adds is the container link and the arithmetic on the customer's page at the cost of one photo
+and one number — a difference to test, not a gap to assert.
 
 ## What it costs — with its limits stated
 
@@ -148,12 +163,13 @@ Timings, honestly labelled:
 | Real phone, first UI, two captures | 25.1 s, 25.5 s | — |
 | Real phone, 17 Sep, pickup step, two captures | **22.7 s, 39.9 s** | — |
 | Ticket step, browser automation (lane 2's script, not a hand) | 0.1 s | — |
-| Ticket step, real phone | *not yet timed by a human* | — |
+| **First-time user, own phone, unprompted, 17 Sep evening — pickup, then ticket** | **41.2 s, then 21.9 s** | — |
 
 The phone numbers matter most, because the product rests on a driver doing this forty times
-a day, now twice per pull. The interface was redesigned after the first two; today's say it
-is still over ten. One live record today carries a ticket timer of 32.7 s, but I have not
-confirmed whose hand that was, so it stays out of the table.
+a day, now twice per pull. The last row is the one to read: a product executive who had
+never seen the screen, given only the link, recorded a pull and tied a ticket to it in 63
+seconds against a 30-second budget, and left gross, tare and facility empty — which is what
+"one photo, one number" predicts. Over target by 2×; not hidden.
 
 **The one thing this will not trade:** capture speed. Pickup under ten seconds, ticket one
 photo and one number; a field that pushes either past its budget loses.
@@ -165,23 +181,35 @@ plan, non-goals) was written before any code. Three Claude Code lanes then built
 one contract in parallel on separate worktrees — data and API, driver and office screens,
 customer page — each with an independent reviewer its work had to pass before merge. The
 merged diff went to a fresh-context review, which found five defects: three fixed before
-deploy, two logged below. 53 tests pass. Every commit is on `main`, so the sequence can be
+deploy, two logged below. 185 tests pass. Every commit is on `main`, so the sequence can be
 checked rather than believed.
+
+Then it broke in front of someone. In a live demo at 15:00 the store lost five real records:
+records lived in one JSON file on Vercel Blob, every write re-read and rewrote it, and Blob's
+listing is eventually consistent — a stale read plus a "no index, must be first run" branch
+reseeded production. Found from the store's own file history in twenty minutes. Fixed the
+same afternoon by removing the design, not patching it: one write-once file per record and
+per ticket, nothing ever overwritten, no code path that can reseed on an error; verified on
+production with parallel writes. Blob was chosen for a two-hour build because the photos
+needed it anyway; a real product puts records in Postgres and keeps Blob for photos. The
+seed also renumbered every id when its 45-day window slid at UTC midnight; ids are now keyed
+per stop and date. Both are in the log.
 
 ## What this does not establish
 
 - **No hauler was interviewed.** This is public desk research, not customer validation. Day
   one is a hauler on the phone: where do your drivers dump, and what does the ticket look like?
-- **The sources of the two customer accounts are unrecovered.** Until then the addressability
-  problem is a hypothesis.
-- **Whether a driver will do a second capture at the scale is unproven**; the phone numbers
-  say not yet at this speed.
+- **Two customer accounts, both single cases.** They establish uncertainty and one refund,
+  not a rate. No count of how often the ticket cannot be tied exists anywhere.
+- **Whether a driver will do a second capture at the scale is unproven**; one first-time user
+  did it in 21.9 s, a driver on stop thirty has not been asked.
 - **Whether roll-off haulers in TrashLab's base dump at third-party scales** — the premise —
   is plausible and unverified.
-- **A write race is open.** Two tickets saved at the same instant can lose one; the store
-  says so in a comment.
-- **Seed ids were renumbered on migration.** Only the pinned link (`/p/260812-nycx`) is
-  stable.
+- **Whether Docket's customer-visible ticket images already solve this for its users** — I
+  read their support pages, not their product.
+- **The office list can lag a few seconds** for a record created on another server instance
+  (Blob listing is eventually consistent); a record's own link is immediate. Nothing can be
+  lost any more, verified with parallel writes on production.
 - **Everything seeded is synthetic and labelled**: fictional street numbers in six metros,
   generated tickets with one six-name facility pool, no tare on about 30 % by design. No
   synthetic ticket has been compared to a real one.
