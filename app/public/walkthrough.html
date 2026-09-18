@@ -2,74 +2,160 @@
 <html lang="en"><head><meta charset="utf-8"><title>Collected — walkthrough</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-:root{--paper:#fff;--ink:#141414;--ink2:#3d3d3d;--rule:#d6d2c9;--accent:#2F2A90}
-html{background:var(--paper)}body{margin:0;color:var(--ink);font:17px/1.5 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;max-width:680px;padding:36px 20px 64px;margin:0 auto}
-h1{font-size:30px;margin:0 0 4px;letter-spacing:-.01em}.tag{color:var(--ink2);margin:0 0 20px;font-size:18px}
-h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin:28px 0 8px;border-top:1px solid var(--rule);padding-top:16px}
-p{margin:0 0 10px}.big{font-size:22px;line-height:1.3;font-weight:600;margin:4px 0 8px}
-blockquote{margin:10px 0;padding:8px 14px;border-left:3px solid var(--accent);color:var(--ink2);font-style:italic}
-ul,ol{padding-left:20px;margin:0}li{margin:0 0 6px}
-.receipt{font:15px ui-monospace,Menlo,monospace;background:#f1efe9;padding:12px 16px;border-radius:4px;margin:8px 0 10px;white-space:pre;overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:16px;margin:6px 0 10px}td,th{text-align:left;padding:7px 8px;border-bottom:1px solid var(--rule);vertical-align:top}th{color:var(--ink2);font-weight:600;width:26%}
-.try{margin-top:24px;padding:20px;border:2px solid var(--accent);border-radius:6px}
-.try a{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:600;padding:12px 16px;border-radius:4px;margin:6px 6px 0 0}
-.try .big{color:var(--accent);margin-top:0}kbd{font:14px ui-monospace,Menlo,monospace;background:#f1efe9;padding:1px 5px;border-radius:3px}
-small{color:var(--ink2)}
-</style></head><body>
-<h1>Collected</h1>
-<p class="tag">Proof of the weight. The scale ticket from the transfer station, tied to the customer's container, on one page with the pickup photo and the math.</p>
+:root{--paper:#FFFFFF;--surface:#F4F2EE;--rule:#C9C5BC;--ink:#111111;--ink-2:#444444;--link:#2F2A90;--warn:#9A1B1B;
+--sans:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Helvetica,Arial,sans-serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+html{background:var(--paper)}
+body{margin:0;color:var(--ink);font:17px/1.5 var(--sans);font-variant-numeric:tabular-nums}
+a{color:var(--link);text-decoration:underline;text-underline-offset:2px}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 20px 64px}
+.mast{display:flex;justify-content:space-between;align-items:baseline;gap:16px;border-bottom:1px solid var(--ink);padding:8px 0 10px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:18px}
+.mast nav{font-size:15px;color:var(--ink-2)}
+.mast nav a{margin-left:16px}
+h1{font-size:34px;line-height:1.12;letter-spacing:-.015em;margin:36px 0 10px;max-width:22ch}
+.sub{font-size:19px;line-height:1.4;color:var(--ink-2);margin:0 0 28px;max-width:60ch}
+/* try box: the recruiter's path, first */
+.try{border:1px solid var(--rule);background:var(--surface);padding:20px 22px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin:0 0 44px}
+.try h2{grid-column:1/-1;margin:0}
+.try .step{font-size:15px;line-height:1.45}
+.try .step b{display:block;font-size:16px;margin-bottom:2px}
+.try .step .go{display:inline-block;margin-top:8px;padding:10px 14px;border:1px solid var(--ink);border-radius:4px;color:var(--ink);text-decoration:none;font-weight:600;font-size:15px;background:var(--paper)}
+.try .step .go:hover{background:var(--ink);color:var(--paper)}
+.try .note{grid-column:1/-1;font-size:14px;color:var(--ink-2);margin:0}
+/* the spine */
+.spine{display:grid;grid-template-columns:200px minmax(0,1fr);column-gap:48px}
+.spine>div{min-width:0}
+.rail{position:sticky;top:20px;align-self:start;font-size:14px;line-height:1.5;color:var(--ink-2)}
+.rail a{display:block;color:var(--ink-2);text-decoration:none;padding:5px 0;border-top:1px solid var(--rule)}
+.rail a:last-child{border-bottom:1px solid var(--rule)}
+.rail a .n{font-family:var(--mono);margin-right:10px;color:var(--ink)}
+.rail .rtitle{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px}
+section{padding:0 0 36px;margin:0 0 36px;border-bottom:1px solid var(--rule);max-width:64ch}
+section:last-child{border-bottom:none}
+h2{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin:0 0 10px}
+h2 .n{font-family:var(--mono);color:var(--ink);margin-right:10px}
+.big{font-size:24px;line-height:1.3;font-weight:600;margin:0 0 12px;letter-spacing:-.01em}
+p{margin:0 0 12px}
+blockquote{margin:14px 0;padding:6px 0 6px 16px;border-left:2px solid var(--ink);color:var(--ink);font-size:17px}
+blockquote small{display:block;color:var(--ink-2);font-size:14px;margin-top:4px;font-style:normal}
+.receipt{border:1px solid var(--rule);background:var(--surface);padding:14px 16px;font-size:15px;line-height:1.35;max-width:420px;width:100%;margin:14px 0 16px}
+.receipt .lbl{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);margin:10px 0 4px;border-top:1px solid var(--rule);padding-top:8px}
+.receipt .lbl.first{margin-top:0;border-top:none;padding-top:0}
+.receipt .kv{display:flex;justify-content:space-between;gap:12px;padding:2px 0}
+.receipt .kv span:first-child{color:var(--ink-2)}
+.receipt .kv span:last-child{font-family:var(--mono)}
+.receipt .amt{font-family:var(--mono);font-size:28px;font-weight:700;margin-top:4px}
+.ns{border:1px solid var(--ink);padding:16px 18px;margin:0 0 16px}
+.ns .lab{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin:0 0 6px}
+.ns .metric{font-size:22px;line-height:1.3;font-weight:600;margin:0}
+table{border-collapse:collapse;width:100%;font-size:15px;margin:6px 0 14px}
+td,th{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+th{color:var(--ink-2);font-weight:600;font-size:13px}
+td.num{font-family:var(--mono);white-space:nowrap}
+.dec{margin:0 0 16px}
+.dec b{display:block;font-size:17px}
+.dec .tr{color:var(--ink-2);font-size:15px;margin-top:2px}
+ul{padding-left:20px;margin:0 0 12px}li{margin:0 0 6px}
+.src{font-size:14px;color:var(--ink-2);line-height:1.45}
+.src code{font-family:var(--mono);font-size:13px}
+.foot{border-top:1px solid var(--ink);margin-top:8px;padding-top:14px;font-size:14px;color:var(--ink-2)}
+@media (max-width:820px){
+  .receipt .kv{flex-wrap:wrap}.receipt .kv span:last-child{white-space:normal}td.num{white-space:normal}
+  .spine{grid-template-columns:1fr}.rail{display:none}
+  .try{grid-template-columns:1fr;gap:14px}
+  h1{font-size:28px;margin-top:28px}.sub{font-size:17px}
+  body{font-size:17px}
+}
+</style></head><body><div class="wrap">
 
-<h2>The problem</h2>
-<p class="big">The record exists and cannot be tied to the customer.</p>
-<p>A roll-off hauler dumps at someone else's transfer station. The scale house prints a paper ticket with gross, tare and net on it, and no container and no customer. Three weeks later an overage charge lands. The customer asks for proof, gets that ticket, and cannot tell it was their load.</p>
-<blockquote>"The weight ticket provided did not have any identifying information that it belonged to our reserved container. I cannot confirm it was actually our ticket." — Trustpilot review, August 2026</blockquote>
+<div class="mast"><span class="brand">Collected</span><nav><a href="/">Driver</a><a href="/office">Office</a><a href="/p/260812-nycx">Customer page</a></nav></div>
 
-<h2>The people</h2>
-<p>Dale runs four roll-off trucks. He does not own a scale, so his drivers dump across town and come back with a paper ticket. His flat rate includes one ton; anything over is billed at $95 a ton, from that paper, when it finally reaches the office.</p>
-<p>Renée is a contractor who rents twenty of Dale's boxes a year. On a Tuesday she gets an invoice for a pull from three weeks ago: $158.65 over. She asks for proof. Dale sends the ticket. It has a weight and a time and nothing that says it was her box. She does not think Dale is a crook. She just cannot check, and she has another hauler's number.</p>
-<p><strong>Without Collected.</strong> When Renée asks for proof, the ticket Dale has is a photo of paper with a weight, a time and maybe a truck number on it. Nothing on it says Renée, her site, or her box. He can send it; she can't check it.</p>
-<p><strong>With Collected.</strong> Three things land on one record: the pickup (container ID, address, time, and where the phone was); the ticket (the photo from the scale house and the net weight, minutes later); the charge (net minus the included ton, times the rate). When the overage goes out, it goes with a link:</p>
-<div class="receipt">Pickup   1428 Mission College Blvd · RO-20-114 · Aug 12, 6:36 AM
-Ticket   Zanker Road Transfer Station · 7:41 AM (+64 min)
-         Gross 19,860 lb   Tare 14,520 lb   Net 5,340 lb
-Charge   5,340 − 2,000 included = 3,340 lb over
-         3,340 ÷ 2,000 × $95.00/ton = $158.65</div>
-<p>Renée sees the box at her address, the ticket 64 minutes later, the math, and $158.65. She can check it. That is the whole product. <small>(Composite; names invented.)</small></p>
-
-<h2>Who gets what</h2>
-<table>
-<tr><th>Driver</th><td>Two photos inside the work he already does, the box and the ticket. One photo, one number. Shows he did the job.</td></tr>
-<tr><th>The hauler</th><td>Bills the overage with proof attached, the day the ticket is printed. Fewer "is that my ticket?" calls, fewer refunds.</td></tr>
-<tr><th>The customer</th><td>Can check the charge in ten seconds. Pays what she owes, keeps the hauler she trusts.</td></tr>
-</table>
-
-<h2>How it is measured</h2>
-<p><strong>Share of billed overages that go out with a ticket tied to the container.</strong> Zero if the ticket was never photographed; zero if it was photographed and sits in a text thread. Inputs: ticket step under 20 seconds, tickets tied per pull, the customer's page found in under 30 seconds from an address and a date.</p>
-<p>In the hauler's terms: fewer ticket-mismatch complaints and fewer refund dollars, month over month. An example, not a measurement: a hauler with 100 disputed tickets a month who refunds half at $75 each is giving back $3,750 a month. That number, before and after, is the one to watch.</p>
-
-<h2>Three product decisions</h2>
-<ul>
-<li><strong>The ticket, not the pickup photo.</strong> The platform's own driver app already photographs the pickup and ties it to the job. What it does not hand the customer is the third-party ticket with the container and the math. One competitor shows ticket images; the difference here is the container link and the arithmetic, at the cost of one photo and one number.</li>
-<li><strong>One record, two photos, one place.</strong> The stop is the object. Pickup and ticket are two slots on it, filled in the moment or later, through the same two taps. Attaching the ticket in a separate flow was tried on 17 September and failed in front of a user.</li>
-<li><strong>Never trade capture speed.</strong> Pickup under ten seconds; the ticket is one photo and one number. A field that improves the record but slows the driver loses.</li>
-</ul>
+<h1>The weight ticket, tied to the customer's container.</h1>
+<p class="sub">A take-home for TrashLab. When a roll-off customer disputes an overage charge, the hauler sends one page: the pickup photo, the scale ticket, and the math. This page is the walkthrough and the reasoning.</p>
 
 <div class="try">
-<p class="big">Try it. Three screens, one record.</p>
-<a href="/">Driver · record a pull</a>
-<a href="/office">Office · find it</a>
-<a href="/p/260812-nycx">Customer · the page</a>
-<p style="margin-top:12px"><small>Driver: pick any stop. Add a pickup photo, then a ticket photo (<kbd>choose from library</kbd> works for both), type <kbd>5340</kbd> as the net weight, Save. Copy the link and open it; that is what the customer sees. Then find your record in the office by address. Seeded data; generated photos are labelled.</small></p>
+<h2>Try it · about 90 seconds, phone or laptop</h2>
+<div class="step"><b>1 · Driver</b>Pick any stop. Add a pickup photo, then a ticket photo (choose from library works for both), type <span style="font-family:var(--mono)">5340</span> as the net weight, Save.<br><a class="go" href="/">Record a pull →</a></div>
+<div class="step"><b>2 · Office</b>Type the street you picked, set today's date, and open the row. Rows without a ticket say so.<br><a class="go" href="/office">Find it →</a></div>
+<div class="step"><b>3 · Customer</b>Open the record's link. This is what goes out with the charge.<br><a class="go" href="/p/260812-nycx">See the page →</a></div>
+<p class="note">Seeded data across six metros; generated photos are labelled. Anything you record is saved on the live site and visible to anyone with its link, so photograph a wall, not a person.</p>
 </div>
 
-<h2>Next</h2>
-<ol>
-<li><strong>Read the ticket.</strong> Pull gross, tare, net and the facility off the photo, and name the transfer station from the GPS fix; the driver confirms one number instead of typing it.</li>
-<li><strong>The charge carries the page.</strong> Every overage line on the invoice gets the link automatically; an overage with no ticket tied is held.</li>
-<li><strong>Could-not-service notice.</strong> The same record, sent the same day a box is blocked, overfilled or not out.</li>
-</ol>
+<div class="spine">
+<div class="rail"><p class="rtitle">The reasoning</p>
+<a href="#p"><span class="n">01</span>The problem</a><a href="#s"><span class="n">02</span>Without, with</a><a href="#m"><span class="n">03</span>How it is measured</a><a href="#d"><span class="n">04</span>Three decisions</a><a href="#t"><span class="n">05</span>What was tested</a><a href="#n"><span class="n">06</span>Next</a><a href="#b"><span class="n">07</span>How it was built</a><a href="#x"><span class="n">08</span>Not checked</a></div>
+<div>
 
-<h2>How it was built, and what was not checked</h2>
-<p><small>Spec before code. Three coding agents built the ticket feature in parallel from one contract, each owning separate files, each reviewed independently; a fresh review of the merged result found five defects before deploy. Their briefs and findings live in a shared <strong>Senso</strong> folder, the context layer the agents and I both read and write, so a new session picks up the state without a transcript.</small></p>
-<p><small>Not checked: no hauler has been spoken to. A first-time user on his own phone recorded a pull in 41 seconds and tied the ticket in 22, against a 30-second budget. Records are files on Vercel Blob, written once; the store lost records on 17 September under two devices writing at once and was rebuilt that afternoon. A real product would keep records in Postgres and photos in Blob.</small></p>
-</body></html>
+<section id="p"><h2><span class="n">01</span>The problem</h2>
+<p class="big">The record exists and cannot be tied to the customer.</p>
+<p>A roll-off hauler who does not own a scale dumps at a transfer station. The scale house prints a paper ticket with gross, tare and net on it, and nothing that says whose container it came from. Weeks later an overage charge arrives with that ticket. The customer cannot tell it was their load.</p>
+<blockquote>"The weight ticket provided did not have any identifying information that it belonged to our reserved container. I cannot confirm it was actually our ticket."<small>Trustpilot, verified review, 13 August 2026. A BBB complaint in June describes the same thing and ended in a company-reported $1,989 refund.</small></blockquote>
+<p>Two complaints show the problem exists. Nobody has counted how often, and no hauler has been asked.</p>
+</section>
+
+<section id="s"><h2><span class="n">02</span>Without, with</h2>
+<p>Dale runs four roll-off trucks and dumps across town. Renée is a contractor who rents twenty of his boxes a year. On a Tuesday she gets an invoice for a pull from three weeks ago, $158.65 over, and asks for proof.</p>
+<p><b>Without Collected,</b> Dale sends the ticket: a photo of paper with a weight and a time on it. Nothing says Renée, her site, or her box. She does not think he is a crook; she cannot check, and she has another hauler's number.</p>
+<p><b>With Collected,</b> three things sit on one record: the pickup (container, address, time, where the phone was), the ticket (the photo from the scale house and the net weight, an hour later), and the charge. Renée gets a link.</p>
+<div class="receipt">
+<div class="lbl first">Pickup</div><div class="kv"><span>1428 Mission College Blvd</span><span>RO-20-114</span></div><div class="kv"><span>Captured</span><span>Aug 12, 6:36 AM</span></div>
+<div class="lbl">Scale ticket</div><div class="kv"><span>Zanker Road Transfer Station</span><span>7:41 AM, +64 min</span></div><div class="kv"><span>Gross · Tare · Net</span><span>19,860 · 14,520 · 5,340 lb</span></div>
+<div class="lbl">Charge</div><div class="kv"><span>5,340 − 2,000 included</span><span>3,340 lb over</span></div><div class="kv"><span>3,340 ÷ 2,000 × $95/ton</span><span></span></div><div class="amt">$158.65</div>
+</div>
+<p>She can check it. That is the whole product. <small style="color:var(--ink-2)">Dale and Renée are composites; the record is the seeded demo.</small></p>
+</section>
+
+<section id="m"><h2><span class="n">03</span>How it is measured</h2>
+<div class="ns"><p class="lab">North Star · an input, not an outcome</p><p class="metric">Share of billed overages that go out with a ticket tied to the container.</p></div>
+<p>It scores zero when the ticket was never photographed, and zero when it was photographed and sits in a text thread. Both failures are the same failure to the customer. Three inputs move it:</p>
+<table><tr><th>Input</th><th>Target</th><th>Why it moves the number</th></tr>
+<tr><td>Ticket step time</td><td class="num">&lt; 20 s</td><td>The adoption lever, twice per pull</td></tr>
+<tr><td>Tickets tied per pull</td><td class="num">%</td><td>Adoption, measured</td></tr>
+<tr><td>Time to the customer's page</td><td class="num">&lt; 30 s</td><td>From an address and a date; the office half</td></tr></table>
+<p><b>Reported beside it, not steered:</b> disputes closed with evidence and refunds avoided, by count and by dollars.</p>
+<p>The office does not compute the North Star yet. Today it shows pickup coverage (91 % of scheduled stops on recorded days). The tickets-tied strip is the first build after submission.</p>
+</section>
+
+<section id="d"><h2><span class="n">04</span>Three decisions, and what each traded</h2>
+<div class="dec"><b>The ticket, not the pickup photo.</b>TrashLab's driver app, per its product page, photographs the pickup and ties it to the job. What it does not hand the customer is the third-party ticket with the container and the math. Docket, per its support pages, shows customers a ticket image; the difference here is the container link and the arithmetic.<div class="tr">The first version was the pickup record. Checking it against TrashLab's driver app showed they already capture the pickup and tie it to the job, so the build moved to the piece their customers were complaining about: the ticket.</div></div>
+<div class="dec"><b>One record, two photos, one screen.</b>The stop is the object; pickup and ticket are two slots on it, filled now or later, through the same taps.<div class="tr">Traded: a separate "attach ticket" flow, tried first; a first-time user could not find it, so it was folded into the one screen.</div></div>
+<div class="dec"><b>Never trade capture speed.</b>Pickup under ten seconds; the ticket is one photo and one number. A field that improves the record but slows the driver loses.<div class="tr">Traded: gross, tare and facility are optional, so the record can be thinner than the ticket.</div></div>
+</section>
+
+<section id="t"><h2><span class="n">05</span>What was tested, and the number</h2>
+<p>The product rests on a driver doing a second capture at the scale. That cannot be proven from a desk, so the untested condition is stated rather than hidden.</p>
+<table><tr><th>Run</th><th>Pickup</th><th>Ticket</th></tr>
+<tr><td>Targets</td><td class="num">10 s</td><td class="num">20 s</td></tr>
+<tr><td>First-time user, own phone, unprompted, 17 Sep</td><td class="num">41.2 s</td><td class="num">21.9 s</td></tr>
+<tr><td>My own phone captures, 17 Sep</td><td class="num">22.7 s · 39.9 s</td><td class="num">—</td></tr></table>
+<p>Over target by about two times. The next measurement that matters is a driver on his thirtieth stop, not a product person on his first.</p>
+</section>
+
+<section id="n"><h2><span class="n">06</span>Next</h2>
+<ul>
+<li><b>Read the ticket.</b> Gross, tare, net and facility off the photo; the transfer station from the GPS fix. The driver confirms one number instead of typing it. Cuts the ticket step.</li>
+<li><b>The charge carries the page.</b> Every overage line on the invoice gets the link; an overage with no ticket tied is held. Moves the North Star.</li>
+<li><b>Could-not-service notice.</b> The same record, sent the day a box is blocked, overfilled or not out. The other charge customers dispute.</li>
+</ul>
+</section>
+
+<section id="b"><h2><span class="n">07</span>How it was built</h2>
+<p>Spec before code: record model, API, acceptance criteria, non-goals. Three coding agents built the ticket feature in parallel from that one contract, each owning separate files, each reviewed independently; a fresh review of the merged result found five defects before deploy, one of them a stored XSS in the facility field. Briefs and findings live in a shared knowledge base (Senso) that the agents and I both read and write, so a new session picks up the state without a transcript.</p>
+<p>A live demo on 17 September exposed a storage race: five records were lost when two devices wrote at once. The cause came out of the file history in twenty minutes; the store was rebuilt that afternoon as write-once files. A real product keeps records in Postgres and photos in Blob.</p>
+</section>
+
+<section id="x"><h2><span class="n">08</span>Not checked</h2>
+<ul>
+<li>No hauler has been spoken to. Day one is a hauler on the phone: where do your drivers dump, and what does the ticket look like?</li>
+<li>Whether TrashLab's "overweight loads" workflow already covers a ticket photo. First question for John.</li>
+<li>Whether roll-off haulers in TrashLab's base dump at third-party scales at all.</li>
+<li>Whether Docket's customer-visible ticket images already settle this for its users.</li>
+<li>Android; a physical print of the customer's page; a driver, not a first-time user, on the ticket step.</li>
+</ul>
+<p class="src">Sources: BBB complaint 24981374, Budget Dumpster, 25 June 2026 · Trustpilot review <code>ca.trustpilot.com/reviews/6a7dcb326076594689656266</code> · the $95-a-ton rate and one-ton inclusion are assumed for the demo.</p>
+</section>
+
+</div></div>
+<div class="foot">Built as a take-home for TrashLab, September 2026. The brief was to build something I had always wanted to build; this is what I found when I went looking for a problem worth the hours in an industry I don't come from.</div>
+</div></body></html>
